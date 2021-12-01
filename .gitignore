@@ -127,3 +127,7 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
+
+# Result data
+data/02_solver_log/*
+data/03_solutions/*

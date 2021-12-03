@@ -6,23 +6,14 @@ class RecombiningTree:
         self.stages = [Stage(i, n_nodes_per_stage[i]) for i in range(self.n_stages)]
         self.stage_index = 0
 
+    def __iter__(self):
+        return IterableWrapper(self, self.stages)
+    
+    def __reversed__(self):
+        return IterableWrapper(self, self.stages, True)
+
     def get_stage(self, stage_num:int):
         return self.stages[stage_num]
-    
-    def current(self):
-        return self.stages(self.stage_index)
-    
-    def next(self):
-        if self.stage_index == len(self.stages-1):
-            raise IndexError("Stage index out of bounds.")
-        self.stage_index += 1
-        return self.current()
-    
-    def prev(self):
-        if self.stage_index == 0:
-            raise IndexError("Stage index out of bounds.")
-        self.stage_index -= 1
-        return self.current()
 
 
 class Stage:
@@ -45,3 +36,17 @@ class Node:
         self.stoch_params = {}
 
     
+class IterableWrapper:
+
+    def __init__(slef, iterable, reversed = False):
+        self.iterable = iterable
+        self.reversed = reversed
+        self.index = -1 if reversed else 0
+
+    def __next__(self):
+        try:
+            result = self.iterable[self.index]
+        except IndexError:
+            raise StopIteration
+        self.index += -1 if self.reversed else +1
+        return result

@@ -11,9 +11,9 @@ class ModelBuilder:
         
         self.model = gp.Model("MILP: Unit commitment")
 
-        # Commitment decisions
+        # Commitment decision
         self.x = []
-        # Dispatch decisions
+        # Dispatch decision
         self.y = []
         # Copy variable
         self.z = []
@@ -28,6 +28,8 @@ class ModelBuilder:
         # Negative slack
         self.ys_n = None
 
+        # Objective
+        self.objective_terms = None
         # Balance constraints
         self.balance_constraints = None
         # Copy constraints
@@ -52,9 +54,10 @@ class ModelBuilder:
 
 
     def add_objective(self, coefficients:list):
-        variables = self.y + self.s_up + self.s_down + [self.ys_p, self.ys_n]
-        objective = gp.LinExpr(coefficients, variables)
-        self.model.setObjective(objective)
+        coefficients = coefficients + [1]
+        variables = self.y + self.s_up + self.s_down + [self.ys_p, self.ys_n, self.theta]
+        self.objective_terms = gp.LinExpr(coefficients, variables)
+        self.model.setObjective(self.objective_terms)
         self.update_model()
 
 
@@ -104,24 +107,69 @@ class ModelBuilder:
             (self.theta >= cut_intercepts[i] + np.asscalar(np.array(cut_gradients[i]).T.dot(x)) for i in range(n_cuts)), "cut")
         self.update_model()
 
+    
+    def remove(self, gurobi_objects):
+        # Remove if gurobi_objects not None or not empty
+        if gurobi_objects: self.model.remove(gurobi_objects)
+
 
     def update_model(self):
         self.model.update()
 
     
     def update_balance_constraints(self, demand:float):
-        self.model.remove(self.balance_constraints)
+        self.remove(self.balance_constraints)
         self.update_model()
         self.add_balance_constraints(demand)
 
 
     def update_copy_constraints(self, trial_point:list):
-        self.model.remove(self.copy_constraints)
+        self.remove(self.copy_constraints)
         self.update_model()
         self.add_copy_constraints(trial_point)
 
     
     def update_cut_constraints(self, cut_intercepts:list, cut_gradients:list):
-        self.model.remove(self.cut_constraints)
+        self.remove(self.cut_constraints)
         self.update_model()
         self.add_cut_constraints(cut_intercepts, cut_gradients)
+
+
+class BackwardModelBuilder(ModelBuilder):
+
+    def __init__(self, n_buses:int, n_lines:int, n_generators:int, generators_at_bus:list) -> None:
+        super().__init__(n_buses, n_lines, n_generators, generators_at_bus)
+        
+        self.n_binary_variables = None        
+        
+        self.relaxed_terms = []
+
+        # Copy variable for binary variables
+        self.kappa = []
+
+
+    # TODO method: Update binary approximation to set n_binary_variables before calling relax and add_copy_constraints 
+    def relax(self, binary_approximation_variables:list):
+        self.remove(self.kappa)
+        self.kappa = []
+        self.n_binary_variables = len(binary_approximation_variables)
+        for j in range(self.n_binary_variables):
+            self.kappa.append(self.model.addVar(vtype = gp.GRB.CONTINUOUS, lb = 0, ub = 1, name = "kappa_%i"%(j+1)))
+        
+        self.relaxed_terms = [binary_approximation_variables[j] - self.kappa[j] for j in range(self.n_binary_variables)]
+
+    
+    def add_copy_constraints(self, binary_approximation_multipliers):
+        self.copy_constraints = self.model.addConstrs((
+            self.z[g] == gp.quicksum(binary_approximation_multipliers[g,j]*self.kappa[j] 
+            for j in range(self.n_binary_variables)) 
+            for g in range(self.n_generators)), "copy")
+
+    
+    def update_copy_constraints(self, binary_approximation_multipliers:list):
+        self.remove(self.copy_constraints)
+        self.update_model()
+        self.add_copy_constraints(binary_approximation_multipliers)
+
+    
+

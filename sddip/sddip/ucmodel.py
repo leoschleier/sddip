@@ -1,7 +1,8 @@
+from abc import ABC, abstractmethod
 import gurobipy as gp
 import numpy as np
 
-class ModelBuilder:
+class ModelBuilder(ABC):
 
     def __init__(self, n_buses:int, n_lines:int, n_generators:int, generators_at_bus:list) -> None:
         self.n_buses = n_buses
@@ -91,10 +92,9 @@ class ModelBuilder:
         self.update_model()
 
 
+    @abstractmethod
     def add_copy_constraints(self, trial_point:list):
-        self.copy_constraints = self.model.addConstrs((self.z[g] == trial_point[g] 
-            for g in range(self.n_generators)), "copy")
-        self.update_model()
+        pass
 
     
     def add_cut_constraints(self, cut_intercepts:list, cut_gradients:list):
@@ -122,11 +122,9 @@ class ModelBuilder:
         self.update_model()
         self.add_balance_constraints(demand)
 
-
+    @abstractmethod
     def update_copy_constraints(self, trial_point:list):
-        self.remove(self.copy_constraints)
-        self.update_model()
-        self.add_copy_constraints(trial_point)
+        pass
 
     
     def update_cut_constraints(self, cut_intercepts:list, cut_gradients:list):
@@ -134,6 +132,25 @@ class ModelBuilder:
         self.update_model()
         self.add_cut_constraints(cut_intercepts, cut_gradients)
 
+    
+    def suppress_output(self):
+        self.model.setParam("OutputFlag", 0)
+
+
+class ForwardModelBuilder(ModelBuilder):
+
+    def __init__(self, n_buses:int, n_lines:int, n_generators:int, generators_at_bus:list) -> None:
+        super().__init__(n_buses, n_lines, n_generators, generators_at_bus)
+
+    def add_copy_constraints(self, trial_point:list):
+        self.copy_constraints = self.model.addConstrs((self.z[g] == trial_point[g] 
+            for g in range(self.n_generators)), "copy")
+        self.update_model()
+    
+    def update_copy_constraints(self, trial_point:list):
+        self.remove(self.copy_constraints)
+        self.update_model()
+        self.add_copy_constraints(trial_point)
 
 class BackwardModelBuilder(ModelBuilder):
 
@@ -148,22 +165,28 @@ class BackwardModelBuilder(ModelBuilder):
         self.kappa = []
 
 
-    # TODO method: Update binary approximation to set n_binary_variables before calling relax and add_copy_constraints 
-    def relax(self, binary_approximation_variables:list):
+    def update_relaxation(self, binary_approximation_variables:list):
         self.remove(self.kappa)
         self.kappa = []
         self.n_binary_variables = len(binary_approximation_variables)
         for j in range(self.n_binary_variables):
             self.kappa.append(self.model.addVar(vtype = gp.GRB.CONTINUOUS, lb = 0, ub = 1, name = "kappa_%i"%(j+1)))
         
+        self.relax(binary_approximation_variables)
+
+
+    def relax(self, binary_approximation_variables:list):      
+        self.check_kappa_not_empty()
         self.relaxed_terms = [binary_approximation_variables[j] - self.kappa[j] for j in range(self.n_binary_variables)]
 
     
-    def add_copy_constraints(self, binary_approximation_multipliers):
+    def add_copy_constraints(self, binary_approximation_multipliers):      
+        self.check_kappa_not_empty()
         self.copy_constraints = self.model.addConstrs((
             self.z[g] == gp.quicksum(binary_approximation_multipliers[g,j]*self.kappa[j] 
             for j in range(self.n_binary_variables)) 
             for g in range(self.n_generators)), "copy")
+        self.update_model()
 
     
     def update_copy_constraints(self, binary_approximation_multipliers:list):
@@ -172,4 +195,6 @@ class BackwardModelBuilder(ModelBuilder):
         self.add_copy_constraints(binary_approximation_multipliers)
 
     
-
+    def check_kappa_not_empty(self):
+        if not self.kappa:
+            raise ValueError("Copy variable does not exist. Call update_relaxation first.")

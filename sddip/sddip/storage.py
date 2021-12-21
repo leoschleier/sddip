@@ -1,22 +1,27 @@
+from abc import ABC, abstractmethod
 import pandas as pd
 
 
-class SolutionStorage:
+class ResultStorage:
 
-    def __init__(self):
+    def __init__(self, result_keys:list =[]):
+        self.result_keys = result_keys
         self.index_names = ("i", "k", "t")
-        self.solutions = {}
+        self.results = {}
 
-    def add_solution(self, iteration_index: int, sample_index: int, stage_index: int, solution:dict):
-        self.solutions[iteration_index, sample_index, stage_index] = solution
+    def add_result(self, iteration_index: int, sample_index: int, stage_index: int, results:dict):
+        self.results[iteration_index, sample_index, stage_index] = results
 
-    def get_solution(self, iteration_index: int, sample_index: int, stage_index: int):
-        return self.solutions[iteration_index, sample_index, stage_index]
+    def get_result(self, iteration_index: int, sample_index: int, stage_index: int):
+        return self.results[iteration_index, sample_index, stage_index]
 
-    def get_stage_solutions(self, stage_index: int):
+    def get_stage_result(self, stage_index: int):
         df = self.to_dataframe()
         return df.query("t == %i"%(stage_index)).to_dict("list")
 
     def to_dataframe(self):
-        df = pd.DataFrame.from_dict(self.solutions, orient="index")
+        df = pd.DataFrame.from_dict(self.results, orient="index")
         return df.rename_axis(self.index_names)
+
+    def create_empty_result_dict(self):
+        return {key: [] for key in self.result_keys}

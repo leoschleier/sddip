@@ -37,18 +37,21 @@ class ModelBuilder(ABC):
         self.copy_constraints = None
         # Cut constraints
         self.cut_constraints = None
+        # Cut lower bound
+        self.cut_lower_bound = None
 
         self.initialize_variables()
     
 
     def initialize_variables(self):
+        #TODO Default lower bounds
         for g in range(self.n_generators):
             self.x.append(self.model.addVar(vtype = gp.GRB.BINARY, name = "x_%i"%(g+1)))
             self.y.append(self.model.addVar(vtype = gp.GRB.CONTINUOUS, lb = 0, name = "y_%i"%(g+1)))
             self.z.append(self.model.addVar(vtype = gp.GRB.CONTINUOUS, lb = 0, ub = 1, name = "z_%i"%(g+1)))
             self.s_up.append(self.model.addVar(vtype = gp.GRB.BINARY, name = "s_up_%i"%(g+1)))
             self.s_down.append(self.model.addVar(vtype = gp.GRB.BINARY, name = "s_down_%i"%(g+1))) 
-        self.theta = self.model.addVar(vtype = gp.GRB.CONTINUOUS, name = "theta")
+        self.theta = self.model.addVar(vtype = gp.GRB.CONTINUOUS, lb = -gp.GRB.INFINITY, name = "theta")
         self.ys_p = self.model.addVar(vtype = gp.GRB.CONTINUOUS, lb = 0, name = "ys_p")
         self.ys_n = self.model.addVar(vtype = gp.GRB.CONTINUOUS, lb = 0, name = "ys_n")
         self.model.update()
@@ -62,9 +65,9 @@ class ModelBuilder(ABC):
         self.update_model()
 
 
-    def add_balance_constraints(self, demand:float):
+    def add_balance_constraints(self, total_demand:float):
         self.balance_constraints = self.model.addConstr(
-            gp.quicksum(self.y) + self.ys_p - self.ys_n == demand, "balance")
+            gp.quicksum(self.y) + self.ys_p - self.ys_n == total_demand, "balance")
         self.update_model()
     
 
@@ -76,8 +79,8 @@ class ModelBuilder(ABC):
         self.update_model()
 
 
-    def add_power_flow_constraints(self, ptdf, max_line_capacities:list):
-        line_flows = [gp.quicksum(ptdf[l,b] * gp.quicksum(self.y[g] for g in self.generators_at_bus[b]) 
+    def add_power_flow_constraints(self, ptdf, max_line_capacities:list, demand:list):
+        line_flows = [gp.quicksum(ptdf[l,b] * (gp.quicksum(self.y[g] for g in self.generators_at_bus[b]) - demand[b])
             for b in range(self.n_buses)) for l in range(self.n_lines)]
         self.model.addConstrs((line_flows[l] <= max_line_capacities[l] for l in range(self.n_lines)), "power-flow(1)")
         self.model.addConstrs((-line_flows[l] <= max_line_capacities[l] for l in range(self.n_lines)), "power-flow(2)")
@@ -92,25 +95,70 @@ class ModelBuilder(ABC):
         self.update_model()
 
 
+    def add_ramp_rate_constraints(self, max_rate_up:list, max_rate_down:list):
+        self.model.addConstrs((self.y[g] - self.z[g] <= max_rate_up[g] for g in range(self.n_generators)), 
+        "rate-up")
+        self.model.addConstrs((self.z[g] - self.y[g] <= max_rate_down[g] for g in range(self.n_generators)), 
+        "rate-down")
+
+
     @abstractmethod
     def add_copy_constraints(self, trial_point:list):
         pass
 
-    
-    def add_cut_constraints(self, cut_intercepts:list, cut_gradients:list):
-        n_cuts = len(cut_intercepts)
-        if not n_cuts == len(cut_gradients):
-            raise ValueError("Number of cut intercepts and number of cuts gradients need to be equal.")
+    def add_cut_lower_bound(self, lower_bound:float):
+        self.cut_lower_bound = self.model.addConstr((self.theta >= lower_bound), "cut-lb")
 
-        x = np.array(self.x)
-        self.cut_constraints = self.model.addConstrs(
-            (self.theta >= cut_intercepts[i] + np.asscalar(np.array(cut_gradients[i]).T.dot(x)) for i in range(n_cuts)), "cut")
+
+    def add_cut_constraints(self, cut_intercepts: list, cut_gradients: list, binary_multipliers:list):
+        for intercept, gradient, multipliers in zip(cut_intercepts, cut_gradients, binary_multipliers):
+            self.add_cut(intercept, gradient, multipliers)
         self.update_model()
+        
+    
+    def add_cut(self, cut_intercept:float, cut_gradient:list, binary_multipliers:np.array):
+        n_var_approximations, n_binaries = binary_multipliers.shape
+        ny = self.model.addVars(n_binaries, vtype = gp.GRB.CONTINUOUS, lb = 0)
+        my = self.model.addVars(n_binaries, vtype = gp.GRB.CONTINUOUS, lb = 0)
+        eta = self.model.addVars(n_var_approximations, vtype = gp.GRB.CONTINUOUS)
+        lmda = self.model.addVars(n_binaries, vtype = gp.GRB.CONTINUOUS, lb = 0, ub = 1)
+
+        non_binary_state_vars = self.y
+
+        w = self.model.addVars(n_binaries, vtype = gp.GRB.BINARY)
+        u = self.model.addVars(n_binaries, vtype = gp.GRB.BINARY)
+
+        # TODO Define Big-Ms
+        m1 = 1
+        m2 = [10000]*n_binaries
+        m3 = -1
+        m4 = [10000]*n_binaries       
+
+        # Cut constraint
+        self.model.addConstr((self.theta >= cut_intercept + lmda.prod(cut_gradient)), "cut")
+
+        # KKT conditions
+        self.model.addConstrs(0 == -cut_gradient[j] - ny[j] + my[j] + gp.quicksum(binary_multipliers[i,j]*eta[i] 
+            for i in range(n_var_approximations)) 
+            for j in range(n_binaries))
+
+        self.model.addConstrs( 0 == gp.quicksum(binary_multipliers[i,j]*lmda[j] 
+            for j in range(n_binaries)) - non_binary_state_vars[i] for i in range(n_var_approximations))
+
+        self.model.addConstrs(lmda[i] <= m1*w[i] for i in range(n_binaries))
+
+        self.model.addConstrs(ny[i] <= m2[i]*(1-w[i]) for i in range(n_binaries))
+
+        self.model.addConstrs(lmda[i]-1 >= m3*u[i] for i in range(n_binaries))
+
+        self.model.addConstrs(my[i] <= m4[i]*(1-u[i]) for i in range(n_binaries))
 
     
     def remove(self, gurobi_objects):
         # Remove if gurobi_objects not None or not empty
-        if gurobi_objects: self.model.remove(gurobi_objects)
+        if gurobi_objects: 
+            self.model.remove(gurobi_objects)
+            self.update_model
 
 
     def update_model(self):
@@ -119,7 +167,6 @@ class ModelBuilder(ABC):
     
     def update_balance_constraints(self, demand:float):
         self.remove(self.balance_constraints)
-        self.update_model()
         self.add_balance_constraints(demand)
 
     @abstractmethod
@@ -127,9 +174,13 @@ class ModelBuilder(ABC):
         pass
 
     
+    def update_cut_lower_bound(self, cut_lower_bound:float):
+        self.remove(self.cut_lower_bound)
+        self.add_cut_lower_bound(cut_lower_bound)
+
+
     def update_cut_constraints(self, cut_intercepts:list, cut_gradients:list):
         self.remove(self.cut_constraints)
-        self.update_model()
         self.add_cut_constraints(cut_intercepts, cut_gradients)
 
     
@@ -149,7 +200,6 @@ class ForwardModelBuilder(ModelBuilder):
     
     def update_copy_constraints(self, trial_point:list):
         self.remove(self.copy_constraints)
-        self.update_model()
         self.add_copy_constraints(trial_point)
 
 class BackwardModelBuilder(ModelBuilder):
@@ -157,44 +207,52 @@ class BackwardModelBuilder(ModelBuilder):
     def __init__(self, n_buses:int, n_lines:int, n_generators:int, generators_at_bus:list) -> None:
         super().__init__(n_buses, n_lines, n_generators, generators_at_bus)
         
-        self.n_binary_variables = None        
+        self.n_trial_binaries = None        
         
         self.relaxed_terms = []
 
+
         # Copy variable for binary variables
-        self.kappa = []
+        self.bin_copy_vars = []
+
+        # Binary approximation constraints
+        self.binary_approximation_constraints = None
 
 
-    def update_relaxation(self, binary_approximation_variables:list):
-        self.remove(self.kappa)
-        self.kappa = []
-        self.n_binary_variables = len(binary_approximation_variables)
-        for j in range(self.n_binary_variables):
-            self.kappa.append(self.model.addVar(vtype = gp.GRB.CONTINUOUS, lb = 0, ub = 1, name = "kappa_%i"%(j+1)))
+    def add_relaxation(self, binary_trial_point:list):
+        self.bin_copy_vars = []
+        self.n_trial_binaries = len(binary_trial_point)
         
-        self.relax(binary_approximation_variables)
+        for j in range(self.n_trial_binaries):
+            self.bin_copy_vars.append(self.model.addVar(vtype = gp.GRB.CONTINUOUS, lb = 0, ub = 1, 
+                name = "bin_copy_vars_%i"%(j+1)))
+        
+        self.relax(binary_trial_point)
 
 
-    def relax(self, binary_approximation_variables:list):      
-        self.check_kappa_not_empty()
-        self.relaxed_terms = [binary_approximation_variables[j] - self.kappa[j] for j in range(self.n_binary_variables)]
+    def relax(self, binary_trial_point:list):      
+        self.check_bin_copy_vars_not_empty()
+        self.relaxed_terms = [binary_trial_point[j] - self.bin_copy_vars[j] for j in range(self.n_trial_binaries)]
 
     
-    def add_copy_constraints(self, binary_approximation_multipliers):      
-        self.check_kappa_not_empty()
+    def add_copy_constraints(self, binary_trial_multipliers:np.array):      
+        n_var_approximations, n_binaries = binary_trial_multipliers.shape
+        
+        self.check_bin_copy_vars_not_empty()
+
         self.copy_constraints = self.model.addConstrs((
-            self.z[g] == gp.quicksum(binary_approximation_multipliers[g,j]*self.kappa[j] 
-            for j in range(self.n_binary_variables)) 
-            for g in range(self.n_generators)), "copy")
+            self.z[i] == gp.quicksum(binary_trial_multipliers[i,j]*self.bin_copy_vars[j] for j in range(n_binaries)) 
+            for i in range(n_var_approximations)), 
+            "copy")
+        
         self.update_model()
 
     
-    def update_copy_constraints(self, binary_approximation_multipliers:list):
+    def update_copy_constraints(self, binary_trial_multipliers:np.array):
         self.remove(self.copy_constraints)
-        self.update_model()
-        self.add_copy_constraints(binary_approximation_multipliers)
+        self.add_copy_constraints(binary_trial_multipliers)
 
     
-    def check_kappa_not_empty(self):
-        if not self.kappa:
-            raise ValueError("Copy variable does not exist. Call update_relaxation first.")
+    def check_bin_copy_vars_not_empty(self):
+        if not self.bin_copy_vars:
+            raise ValueError("Copy variable does not exist. Call add_relaxation first.")

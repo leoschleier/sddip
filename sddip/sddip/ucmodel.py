@@ -1,6 +1,7 @@
 from abc import ABC, abstractmethod
 import gurobipy as gp
 import numpy as np
+from scipy import linalg
 
 class ModelBuilder(ABC):
 
@@ -16,8 +17,9 @@ class ModelBuilder(ABC):
         self.x = []
         # Dispatch decision
         self.y = []
-        # Copy variable
-        self.z = []
+        # Copy variables
+        self.z_x = []
+        self.z_y = []
         # Startup decsision
         self.s_up = []
         # Shutdown decision
@@ -34,7 +36,8 @@ class ModelBuilder(ABC):
         # Balance constraints
         self.balance_constraints = None
         # Copy constraints
-        self.copy_constraints = None
+        self.copy_constraints_x = None
+        self.copy_constraints_y = None
         # Cut constraints
         self.cut_constraints = None
         # Cut lower bound
@@ -48,7 +51,8 @@ class ModelBuilder(ABC):
         for g in range(self.n_generators):
             self.x.append(self.model.addVar(vtype = gp.GRB.BINARY, name = "x_%i"%(g+1)))
             self.y.append(self.model.addVar(vtype = gp.GRB.CONTINUOUS, lb = 0, name = "y_%i"%(g+1)))
-            self.z.append(self.model.addVar(vtype = gp.GRB.CONTINUOUS, lb = 0, ub = 1, name = "z_%i"%(g+1)))
+            self.z_x.append(self.model.addVar(vtype = gp.GRB.CONTINUOUS, lb = 0, ub = 1, name = "z_x_%i"%(g+1)))
+            self.z_y.append(self.model.addVar(vtype = gp.GRB.CONTINUOUS, lb = 0, ub = 1, name = "z_y_%i"%(g+1)))
             self.s_up.append(self.model.addVar(vtype = gp.GRB.BINARY, name = "s_up_%i"%(g+1)))
             self.s_down.append(self.model.addVar(vtype = gp.GRB.BINARY, name = "s_down_%i"%(g+1))) 
         self.theta = self.model.addVar(vtype = gp.GRB.CONTINUOUS, lb = -gp.GRB.INFINITY, name = "theta")
@@ -88,22 +92,22 @@ class ModelBuilder(ABC):
 
 
     def add_startup_shutdown_constraints(self):
-        self.model.addConstrs((self.x[g] - self.z[g] <= self.s_up[g]  
+        self.model.addConstrs((self.x[g] - self.z_x[g] <= self.s_up[g]  
             for g in range(self.n_generators)), "up-down(1)")
-        self.model.addConstrs((self.x[g] - self.z[g] <= self.s_up[g] - self.s_down[g]  
+        self.model.addConstrs((self.x[g] - self.z_x[g] <= self.s_up[g] - self.s_down[g]  
             for g in range(self.n_generators)), "up-down(2)")
         self.update_model()
 
 
     def add_ramp_rate_constraints(self, max_rate_up:list, max_rate_down:list):
-        self.model.addConstrs((self.y[g] - self.z[g] <= max_rate_up[g] for g in range(self.n_generators)), 
+        self.model.addConstrs((self.y[g] - self.z_y[g] <= max_rate_up[g] for g in range(self.n_generators)), 
         "rate-up")
-        self.model.addConstrs((self.z[g] - self.y[g] <= max_rate_down[g] for g in range(self.n_generators)), 
+        self.model.addConstrs((self.z_y[g] - self.y[g] <= max_rate_down[g] for g in range(self.n_generators)), 
         "rate-down")
 
 
     @abstractmethod
-    def add_copy_constraints(self, trial_point:list):
+    def add_copy_constraints(self, x_trial_point:list, y_trial_point):
         pass
 
     def add_cut_lower_bound(self, lower_bound:float):
@@ -116,42 +120,47 @@ class ModelBuilder(ABC):
         self.update_model()
         
     
-    def add_cut(self, cut_intercept:float, cut_gradient:list, binary_multipliers:np.array):
-        n_var_approximations, n_binaries = binary_multipliers.shape
-        ny = self.model.addVars(n_binaries, vtype = gp.GRB.CONTINUOUS, lb = 0)
-        my = self.model.addVars(n_binaries, vtype = gp.GRB.CONTINUOUS, lb = 0)
-        eta = self.model.addVars(n_var_approximations, vtype = gp.GRB.CONTINUOUS)
-        lmda = self.model.addVars(n_binaries, vtype = gp.GRB.CONTINUOUS, lb = 0, ub = 1)
+    def add_cut(self, cut_intercept:float, cut_gradient:list, y_binary_multipliers:np.array):
+        x_binary_multipliers = linalg.block_diag(*[1]*len(self.x))
 
-        non_binary_state_vars = self.y
+        binary_multipliers = linalg.block_diag(x_binary_multipliers, y_binary_multipliers)
+        
+        n_var_approximations, n_binaries = y_binary_multipliers.shape
 
-        w = self.model.addVars(n_binaries, vtype = gp.GRB.BINARY)
-        u = self.model.addVars(n_binaries, vtype = gp.GRB.BINARY)
+        ny = self.model.addVars(n_binaries, vtype = gp.GRB.CONTINUOUS, lb = 0, name = "ny")
+        my = self.model.addVars(n_binaries, vtype = gp.GRB.CONTINUOUS, lb = 0, name = "my")
+        eta = self.model.addVars(n_var_approximations, vtype = gp.GRB.CONTINUOUS, name = "eta")
+        lmda = self.model.addVars(n_binaries, vtype = gp.GRB.CONTINUOUS, lb = 0, ub = 1, name = "lambda")
+
+        state_vars = self.x + self.y
+
+        w = self.model.addVars(n_binaries, vtype = gp.GRB.BINARY, name = "w")
+        u = self.model.addVars(n_binaries, vtype = gp.GRB.BINARY, name = "u")
 
         # TODO Define Big-Ms
         m1 = 1
-        m2 = [10000]*n_binaries
+        m2 = [100000000]*n_binaries
         m3 = -1
-        m4 = [10000]*n_binaries       
+        m4 = [100000000]*n_binaries       
 
         # Cut constraint
         self.model.addConstr((self.theta >= cut_intercept + lmda.prod(cut_gradient)), "cut")
 
         # KKT conditions
-        self.model.addConstrs(0 == -cut_gradient[j] - ny[j] + my[j] + gp.quicksum(binary_multipliers[i,j]*eta[i] 
+        self.model.addConstrs((0 == -cut_gradient[j] - ny[j] + my[j] + gp.quicksum(binary_multipliers[i,j]*eta[i] 
             for i in range(n_var_approximations)) 
-            for j in range(n_binaries))
+            for j in range(n_binaries)), "KKT(1)")
 
-        self.model.addConstrs( 0 == gp.quicksum(binary_multipliers[i,j]*lmda[j] 
-            for j in range(n_binaries)) - non_binary_state_vars[i] for i in range(n_var_approximations))
+        self.model.addConstrs((0 == gp.quicksum(binary_multipliers[i,j]*lmda[j] 
+            for j in range(n_binaries)) - state_vars[i] for i in range(n_var_approximations)), "KKT(2)")
 
-        self.model.addConstrs(lmda[i] <= m1*w[i] for i in range(n_binaries))
+        self.model.addConstrs((lmda[i] <= m1*w[i] for i in range(n_binaries)), "KKT(3)")
 
-        self.model.addConstrs(ny[i] <= m2[i]*(1-w[i]) for i in range(n_binaries))
+        self.model.addConstrs((ny[i] <= m2[i]*(1-w[i]) for i in range(n_binaries)),"KKT(4)")
 
-        self.model.addConstrs(lmda[i]-1 >= m3*u[i] for i in range(n_binaries))
+        self.model.addConstrs((lmda[i]-1 >= m3*u[i] for i in range(n_binaries)), "KKT(5)")
 
-        self.model.addConstrs(my[i] <= m4[i]*(1-u[i]) for i in range(n_binaries))
+        self.model.addConstrs((my[i] <= m4[i]*(1-u[i]) for i in range(n_binaries)), "KKT(6)")
 
     
     def remove(self, gurobi_objects):
@@ -170,7 +179,7 @@ class ModelBuilder(ABC):
         self.add_balance_constraints(demand)
 
     @abstractmethod
-    def update_copy_constraints(self, trial_point:list):
+    def update_copy_constraints(self, x_trial_point:list, y_trial_point:list):
         pass
 
     
@@ -193,66 +202,86 @@ class ForwardModelBuilder(ModelBuilder):
     def __init__(self, n_buses:int, n_lines:int, n_generators:int, generators_at_bus:list) -> None:
         super().__init__(n_buses, n_lines, n_generators, generators_at_bus)
 
-    def add_copy_constraints(self, trial_point:list):
-        self.copy_constraints = self.model.addConstrs((self.z[g] == trial_point[g] 
-            for g in range(self.n_generators)), "copy")
+    def add_copy_constraints(self, x_trial_point:list, y_trial_point:list):
+        self.copy_constraints_y = self.model.addConstrs((self.z_x[g] == x_trial_point[g] 
+            for g in range(self.n_generators)), "copy-x")
+        self.copy_constraints_x = self.model.addConstrs((self.z_y[g] == y_trial_point[g] 
+            for g in range(self.n_generators)), "copy-y")
         self.update_model()
     
-    def update_copy_constraints(self, trial_point:list):
-        self.remove(self.copy_constraints)
-        self.add_copy_constraints(trial_point)
+    def update_copy_constraints(self, x_trial_point:list, y_trial_point:list):
+        self.remove(self.copy_constraints_x)
+        self.remove(self.copy_constraints_y)
+        self.add_copy_constraints(x_trial_point, y_trial_point)
 
 class BackwardModelBuilder(ModelBuilder):
 
     def __init__(self, n_buses:int, n_lines:int, n_generators:int, generators_at_bus:list) -> None:
         super().__init__(n_buses, n_lines, n_generators, generators_at_bus)
         
-        self.n_trial_binaries = None        
+        self.n_x_trial_binaries = None
+        self.n_y_trial_binaries = None
         
         self.relaxed_terms = []
 
 
         # Copy variable for binary variables
+        self.x_bin_copy_vars = []
+        self.y_bin_copy_vars = []
+
+        # Copy constraints
+        self.copy_constraints_x = None
+        self.copy_constraints_y = None
+
+
+    def add_relaxation(self, x_binary_trial_point:list, y_binary_trial_point:list):
         self.bin_copy_vars = []
-
-        # Binary approximation constraints
-        self.binary_approximation_constraints = None
-
-
-    def add_relaxation(self, binary_trial_point:list):
-        self.bin_copy_vars = []
-        self.n_trial_binaries = len(binary_trial_point)
+        self.n_x_trial_binaries = len(x_binary_trial_point)
+        self.n_y_trial_binaries = len(y_binary_trial_point)
         
-        for j in range(self.n_trial_binaries):
-            self.bin_copy_vars.append(self.model.addVar(vtype = gp.GRB.CONTINUOUS, lb = 0, ub = 1, 
-                name = "bin_copy_vars_%i"%(j+1)))
+        for j in range(self.n_x_trial_binaries):
+            self.x_bin_copy_vars.append(self.model.addVar(vtype = gp.GRB.CONTINUOUS, lb = 0, ub = 1, 
+                name = "x_bin_copy_var_%i"%(j+1)))
+
+        for j in range(self.n_y_trial_binaries):
+            self.y_bin_copy_vars.append(self.model.addVar(vtype = gp.GRB.CONTINUOUS, lb = 0, ub = 1, 
+                name = "y_bin_copy_var_%i"%(j+1)))
         
-        self.relax(binary_trial_point)
+        self.relax(x_binary_trial_point, y_binary_trial_point)
 
 
-    def relax(self, binary_trial_point:list):      
+    def relax(self, x_binary_trial_point:list, y_binary_trial_point:list):      
         self.check_bin_copy_vars_not_empty()
-        self.relaxed_terms = [binary_trial_point[j] - self.bin_copy_vars[j] for j in range(self.n_trial_binaries)]
+
+        self.relaxed_terms += [x_binary_trial_point[j] - self.x_bin_copy_vars[j] 
+            for j in range(self.n_x_trial_binaries)]
+
+        self.relaxed_terms += [y_binary_trial_point[j] - self.y_bin_copy_vars[j] 
+            for j in range(self.n_y_trial_binaries)]
 
     
-    def add_copy_constraints(self, binary_trial_multipliers:np.array):      
-        n_var_approximations, n_binaries = binary_trial_multipliers.shape
-        
+    def add_copy_constraints(self, y_binary_trial_multipliers:np.array):      
         self.check_bin_copy_vars_not_empty()
 
-        self.copy_constraints = self.model.addConstrs((
-            self.z[i] == gp.quicksum(binary_trial_multipliers[i,j]*self.bin_copy_vars[j] for j in range(n_binaries)) 
-            for i in range(n_var_approximations)), 
-            "copy")
+        n_y_var_approximations, n_y_binaries = y_binary_trial_multipliers.shape
+
+        self.copy_constraints_y = self.model.addConstrs((
+            self.z_y[i] == gp.quicksum(y_binary_trial_multipliers[i,j]*self.y_bin_copy_vars[j] 
+                for j in range(n_y_binaries)) 
+                for i in range(n_y_var_approximations)), "copy-y")
+
+        self.copy_constraints_x = self.model.addConstrs((
+            self.z_x[i] == self.x_bin_copy_vars[i] for i in range(self.n_x_trial_binaries)), "copy-x")
         
         self.update_model()
 
     
-    def update_copy_constraints(self, binary_trial_multipliers:np.array):
-        self.remove(self.copy_constraints)
-        self.add_copy_constraints(binary_trial_multipliers)
+    def update_copy_constraints(self, y_binary_trial_multipliers:np.array):
+        self.remove(self.copy_constraints_x)
+        self.remove(self.copy_constraints_y)
+        self.add_copy_constraints(y_binary_trial_multipliers)
 
     
     def check_bin_copy_vars_not_empty(self):
-        if not self.bin_copy_vars:
+        if not (self.x_bin_copy_vars and self.y_bin_copy_vars):
             raise ValueError("Copy variable does not exist. Call add_relaxation first.")

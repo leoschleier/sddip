@@ -35,7 +35,7 @@ class SubgradientMethod:
             # Optimal value
             opt_value = model.getObjective().getValue()
             subgradient = np.array([t.getValue() for t in relaxed_terms])
-
+           
             # Check Stopping criteria
             gradient_magnitude = np.linalg.norm(subgradient, 2)
             if gradient_magnitude <= self.tolerance: break
@@ -56,7 +56,6 @@ class SubgradientMethod:
                 dual_multipliers = dual_multipliers + step_size*subgradient
 
         self.results.set_values(opt_value, dual_multipliers, subgradient, lower_bound, step_size)
-
         return (model, self.results)
 
 

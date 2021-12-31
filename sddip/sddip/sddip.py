@@ -3,12 +3,15 @@ import numpy as np
 import pandas as pd
 import gurobipy as gp
 from scipy import stats, linalg
+from time import time
 
 import storage as storage
 import utils
 import dualsolver as dualsolver
 import ucmodel as ucmodel
 from parameters import Parameters
+import config
+import logger
       
 
 class AlgoResults:
@@ -39,30 +42,58 @@ class AlgoResults:
 
 class SddipAlgorithm(AlgoResults):
 
-    def __init__(self, test_case:str):
+    def __init__(self, test_case:str, log_dir:str):
         super().__init__()
-
+        self.runtime_logger = logger.RuntimeLogger(log_dir)
         self.params = Parameters(test_case)
         self.binarizer = utils.Binarizer()
         self.sg_method = dualsolver.SubgradientMethod(max_iterations=100)
 
     def run(self, n_iterations = 2):
         print("#### SDDiP-Algorithm started ####")
+        self.runtime_logger.start()
         for i in range(n_iterations):
-            print("Iteration: {}".format(i))
+            ########################################
+            # Sampling
+            ########################################
             # TODO sampling
+            sampling_start_time = time()
             samples = [[0,1], [0,0]]
             n_samples = len(samples)
+            self.runtime_logger.log_task_end(f"sampling_i{i+1}", sampling_start_time)
 
+            ########################################
+            # Forward pass
+            ########################################
+            forward_pass_start_time = time()
             v_opt_k = self.forward_pass(i, samples)
-
+            self.runtime_logger.log_task_end(f"forward_pass_i{i+1}", forward_pass_start_time)
+            
+            ########################################
+            # Statistical upper bound
+            ########################################
+            upper_bound_start_time = time()
             v_upper = self.statistical_upper_bound(v_opt_k, n_samples)
             print("Statistical upper bound: {} ".format(v_upper))
+            self.runtime_logger.log_task_end(f"upper_bound_i{i+1}", upper_bound_start_time)
 
+
+            ########################################
+            # Backward pass
+            ########################################
+            backward_pass_start_time = time()
             self.backward_pass(i, samples)
+            self.runtime_logger.log_task_end(f"backward_pass_i{i+1}", backward_pass_start_time)
 
+            ########################################
+            # Lower bound
+            ########################################
+            lower_bound_start_time = time()
             v_lower = self.lower_bound(i)
             print("Lower bound: {} ".format(v_upper))
+            self.runtime_logger.log_task_end(f"lower_bound_i{i+1}", lower_bound_start_time)
+
+        self.runtime_logger.log_experiment_end()
         print("#### SDDiP-Algorithm finished ####")
         
     
@@ -286,5 +317,7 @@ class SddipAlgorithm(AlgoResults):
 
 
 if __name__ == '__main__':
-    algorithm = SddipAlgorithm("WB2")
+    log_manager = logger.LogManager()
+    log_dir = log_manager.create_log_dir("log")
+    algorithm = SddipAlgorithm("WB2", log_dir)
     algorithm.run()

@@ -1,8 +1,11 @@
+import sys
+sys.path.append('../sddip')
+
 import os, shutil
+from sddip.sddip import config
 
-result_dirs =  ['../data/02_solver_log', '../data/03_solutions']
 
-for dir in result_dirs:
+for dir in config.result_directories:
     for filename in os.listdir(dir):
         file_path = os.path.join(dir, filename)
         try:

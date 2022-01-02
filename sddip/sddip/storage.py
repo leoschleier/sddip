@@ -1,11 +1,28 @@
-from abc import ABC, abstractmethod
+import os
 import pandas as pd
 
+from datetime import datetime
+import config
+
+
+class ResultsManager:
+    def __init__(self):
+        pass
+        
+
+    def create_results_dir(self, dir_label:str)->str:
+        start_time_str = datetime.today().strftime("%Y_%m_%d__%H_%M_%S")
+        dir_name = f"{dir_label}_{start_time_str}"
+        results_dir = os.path.join(config.solutions_dir, dir_name)
+        os.mkdir(results_dir)
+
+        return results_dir
 
 class ResultStorage:
 
-    def __init__(self, result_keys:list =[]):
+    def __init__(self, result_keys:list =[], label="results"):
         self.result_keys = result_keys
+        self.label = label
         self.index_names = ("i", "k", "t")
         self.results = {}
 
@@ -25,3 +42,7 @@ class ResultStorage:
 
     def create_empty_result_dict(self):
         return {key: [] for key in self.result_keys}
+
+    def export_results(self, results_dir:str):
+        df = self.to_dataframe()
+        df.to_csv(os.path.join(results_dir, f"{self.label}.csv"))

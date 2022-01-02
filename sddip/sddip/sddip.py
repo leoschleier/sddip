@@ -4,43 +4,18 @@ import pandas as pd
 import gurobipy as gp
 from scipy import stats, linalg
 from time import time
+from constants import ResultKeys
 
-import storage as storage
+import storage
 import utils
 import dualsolver as dualsolver
 import ucmodel as ucmodel
 from parameters import Parameters
 import config
-import logger
-      
-
-class AlgoResults:
-    # Result keys
-    x_key = "x"
-    y_key = "y"
-    z_x_key = "zx"
-    z_y_key = "zy"
-    primal_solution_keys = [x_key, y_key, z_x_key, z_y_key]
-
-    dv_key = "dual_value"
-    dm_key = "dual_multiplier"
-    dual_solution_keys = [dv_key, dm_key]
-
-    ci_key = "intercepts"
-    cg_key = "gradients"
-    bm_key = "multipliers"
-    cut_coefficient_keys = [ci_key, cg_key, bm_key]
-        
-    # Result storage
-    def __init__(self):
-        self.ps_storage = storage.ResultStorage(AlgoResults.primal_solution_keys)
-        self.ds_storage = storage.ResultStorage(AlgoResults.dual_solution_keys)
-        self.cc_storage = storage.ResultStorage(AlgoResults.cut_coefficient_keys)
-
-    
+import logger   
 
 
-class SddipAlgorithm(AlgoResults):
+class SddipAlgorithm:
 
     def __init__(self, test_case:str, log_dir:str):
         super().__init__()
@@ -48,6 +23,11 @@ class SddipAlgorithm(AlgoResults):
         self.params = Parameters(test_case)
         self.binarizer = utils.Binarizer()
         self.sg_method = dualsolver.SubgradientMethod(max_iterations=100)
+
+        #Result storage
+        self.ps_storage = storage.ResultStorage(ResultKeys.primal_solution_keys, "primal_solutions")
+        self.ds_storage = storage.ResultStorage(ResultKeys.dual_solution_keys, "dual_solutions")
+        self.cc_storage = storage.ResultStorage(ResultKeys.cut_coefficient_keys, "cut_coefficients")
 
     def run(self, n_iterations = 2):
         print("#### SDDiP-Algorithm started ####")
@@ -132,8 +112,8 @@ class SddipAlgorithm(AlgoResults):
                 
                 if i>0:
                     cut_coefficients = self.cc_storage.get_stage_result(t)
-                    uc_fw.add_cut_constraints(cut_coefficients[AlgoResults.ci_key], 
-                        cut_coefficients[AlgoResults.cg_key], cut_coefficients[AlgoResults.bm_key])
+                    uc_fw.add_cut_constraints(cut_coefficients[ResultKeys.ci_key], 
+                        cut_coefficients[ResultKeys.cg_key], cut_coefficients[ResultKeys.bm_key])
                 
                 # Solve problem
                 uc_fw.suppress_output()
@@ -150,7 +130,7 @@ class SddipAlgorithm(AlgoResults):
                 
                 # Value of stage t objective function
                 v_opt_kt = uc_fw.model.getObjective().getValue() - uc_fw.theta.x
-
+                print(v_opt_kt)
                 v_opt_k[-1] += v_opt_kt
 
                 # New trial point
@@ -159,10 +139,10 @@ class SddipAlgorithm(AlgoResults):
                 y_trial_point = y_kt
 
                 ps_dict = self.ps_storage.create_empty_result_dict()
-                ps_dict[AlgoResults.x_key] = x_kt
-                ps_dict[AlgoResults.y_key] = y_kt
-                ps_dict[AlgoResults.z_x_key] = z_x_kt
-                ps_dict[AlgoResults.z_y_key] = z_y_kt
+                ps_dict[ResultKeys.x_key] = x_kt
+                ps_dict[ResultKeys.y_key] = y_kt
+                ps_dict[ResultKeys.z_x_key] = z_x_kt
+                ps_dict[ResultKeys.z_y_key] = z_y_kt
                 
                 self.ps_storage.add_result(i, k, t, ps_dict)
         
@@ -193,8 +173,8 @@ class SddipAlgorithm(AlgoResults):
                     bin_vars = []
                     bin_multipliers = []
                     if t>0:
-                        float_vars = self.ps_storage.get_result(i,k,t-1)[AlgoResults.y_key]
-                        x_binary_trial_point = self.ps_storage.get_result(i,k,t-1)[AlgoResults.x_key]
+                        float_vars = self.ps_storage.get_result(i,k,t-1)[ResultKeys.y_key]
+                        x_binary_trial_point = self.ps_storage.get_result(i,k,t-1)[ResultKeys.x_key]
                     else:
                         #TODO Approximation needed?
                         # Might lead to active penalty
@@ -235,8 +215,8 @@ class SddipAlgorithm(AlgoResults):
                     
                     if t < self.params.n_stages-1:
                         cut_coefficients = self.cc_storage.get_stage_result(t)
-                        uc_bw.add_cut_constraints(cut_coefficients[AlgoResults.ci_key], 
-                            cut_coefficients[AlgoResults.cg_key], cut_coefficients[AlgoResults.bm_key])
+                        uc_bw.add_cut_constraints(cut_coefficients[ResultKeys.ci_key], 
+                            cut_coefficients[ResultKeys.cg_key], cut_coefficients[ResultKeys.bm_key])
 
                     objective_terms = uc_bw.objective_terms
                     relaxed_terms = uc_bw.relaxed_terms
@@ -248,20 +228,20 @@ class SddipAlgorithm(AlgoResults):
 
                     
                     # Dual value and multiplier for each realization
-                    ds_dict[AlgoResults.dv_key].append(sg_results.obj_value)
-                    ds_dict[AlgoResults.dm_key].append(sg_results.multipliers)
+                    ds_dict[ResultKeys.dv_key].append(sg_results.obj_value)
+                    ds_dict[ResultKeys.dm_key].append(sg_results.multipliers)
                     
                 
                 self.ds_storage.add_result(i, k, t, ds_dict)
 
                 # Calculate and store cut coefficients
                 probabilities = self.params.prob[t]        
-                intercept = np.array(probabilities).dot(np.array(ds_dict[AlgoResults.dv_key]))
-                gradient = np.array(probabilities).dot(np.array(ds_dict[AlgoResults.dm_key]))
+                intercept = np.array(probabilities).dot(np.array(ds_dict[ResultKeys.dv_key]))
+                gradient = np.array(probabilities).dot(np.array(ds_dict[ResultKeys.dm_key]))
 
-                cc_dict[AlgoResults.ci_key] = intercept.tolist()
-                cc_dict[AlgoResults.cg_key] = gradient.tolist()
-                cc_dict[AlgoResults.bm_key] = y_binary_trial_multipliers
+                cc_dict[ResultKeys.ci_key] = intercept.tolist()
+                cc_dict[ResultKeys.cg_key] = gradient.tolist()
+                cc_dict[ResultKeys.bm_key] = y_binary_trial_multipliers
 
                 if t > 0 : self.cc_storage.add_result(i, k, t-1, cc_dict)
 
@@ -296,8 +276,8 @@ class SddipAlgorithm(AlgoResults):
 
         if i>0:
             cut_coefficients = self.cc_storage.get_stage_result(t)
-            uc_fw.add_cut_constraints(cut_coefficients[AlgoResults.ci_key], cut_coefficients[AlgoResults.cg_key], 
-                cut_coefficients[AlgoResults.bm_key])
+            uc_fw.add_cut_constraints(cut_coefficients[ResultKeys.ci_key], cut_coefficients[ResultKeys.cg_key], 
+                cut_coefficients[ResultKeys.bm_key])
 
         # Solve problem
         uc_fw.suppress_output()
@@ -319,5 +299,14 @@ class SddipAlgorithm(AlgoResults):
 if __name__ == '__main__':
     log_manager = logger.LogManager()
     log_dir = log_manager.create_log_dir("log")
+    
     algorithm = SddipAlgorithm("WB2", log_dir)
     algorithm.run()
+
+    results_manager = storage.ResultsManager()
+    results_dir = results_manager.create_results_dir("results")
+
+    algorithm.ps_storage.export_results(results_dir)
+    algorithm.ds_storage.export_results(results_dir)
+    algorithm.cc_storage.export_results(results_dir)
+

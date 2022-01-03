@@ -29,7 +29,7 @@ class SddipAlgorithm:
         self.ds_storage = storage.ResultStorage(ResultKeys.dual_solution_keys, "dual_solutions")
         self.cc_storage = storage.ResultStorage(ResultKeys.cut_coefficient_keys, "cut_coefficients")
 
-    def run(self, n_iterations = 2):
+    def run(self, n_iterations = 10):
         print("#### SDDiP-Algorithm started ####")
         self.runtime_logger.start()
         for i in range(n_iterations):
@@ -70,7 +70,7 @@ class SddipAlgorithm:
             ########################################
             lower_bound_start_time = time()
             v_lower = self.lower_bound(i)
-            print("Lower bound: {} ".format(v_upper))
+            print("Lower bound: {} ".format(v_lower))
             self.runtime_logger.log_task_end(f"lower_bound_i{i+1}", lower_bound_start_time)
 
         self.runtime_logger.log_experiment_end()
@@ -95,7 +95,7 @@ class SddipAlgorithm:
 
                 uc_fw.add_objective(self.params.cost_coeffs)
 
-                uc_fw.add_balance_constraints(self.params.p_d[t][n])
+                uc_fw.add_balance_constraints(sum(self.params.p_d[t][n]))
 
                 uc_fw.add_power_flow_constraints(self.params.ptdf, self.params.pl_max, self.params.p_d[t][n])
 
@@ -197,7 +197,7 @@ class SddipAlgorithm:
 
                     uc_bw.add_objective(self.params.cost_coeffs)
 
-                    uc_bw.add_balance_constraints(self.params.p_d[t][n])
+                    uc_bw.add_balance_constraints(sum(self.params.p_d[t][n]))
 
                     uc_bw.add_generator_constraints(self.params.pg_min, self.params.pg_max)
 

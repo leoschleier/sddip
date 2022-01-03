@@ -51,14 +51,16 @@ class ModelBuilder(ABC):
         for g in range(self.n_generators):
             self.x.append(self.model.addVar(vtype = gp.GRB.BINARY, name = "x_%i"%(g+1)))
             self.y.append(self.model.addVar(vtype = gp.GRB.CONTINUOUS, lb = 0, name = "y_%i"%(g+1)))
-            self.z_x.append(self.model.addVar(vtype = gp.GRB.CONTINUOUS, lb = 0, ub = 1, name = "z_x_%i"%(g+1)))
-            self.z_y.append(self.model.addVar(vtype = gp.GRB.CONTINUOUS, lb = 0, ub = 1, name = "z_y_%i"%(g+1)))
             self.s_up.append(self.model.addVar(vtype = gp.GRB.BINARY, name = "s_up_%i"%(g+1)))
             self.s_down.append(self.model.addVar(vtype = gp.GRB.BINARY, name = "s_down_%i"%(g+1))) 
         self.theta = self.model.addVar(vtype = gp.GRB.CONTINUOUS, lb = -gp.GRB.INFINITY, name = "theta")
         self.ys_p = self.model.addVar(vtype = gp.GRB.CONTINUOUS, lb = 0, name = "ys_p")
         self.ys_n = self.model.addVar(vtype = gp.GRB.CONTINUOUS, lb = 0, name = "ys_n")
         self.model.update()
+
+    @abstractmethod
+    def initialize_copy_variables(self):
+        pass
 
 
     def add_objective(self, coefficients:list):
@@ -201,6 +203,12 @@ class ForwardModelBuilder(ModelBuilder):
 
     def __init__(self, n_buses:int, n_lines:int, n_generators:int, generators_at_bus:list) -> None:
         super().__init__(n_buses, n_lines, n_generators, generators_at_bus)
+        self.initialize_copy_variables()
+
+    def initialize_copy_variables(self):
+        for g in range(self.n_generators):
+            self.z_x.append(self.model.addVar(vtype = gp.GRB.CONTINUOUS, lb = -gp.GRB.INFINITY, name = "z_x_%i"%(g+1)))
+            self.z_y.append(self.model.addVar(vtype = gp.GRB.CONTINUOUS, lb = -gp.GRB.INFINITY, name = "z_y_%i"%(g+1)))
 
     def add_copy_constraints(self, x_trial_point:list, y_trial_point:list):
         self.copy_constraints_y = self.model.addConstrs((self.z_x[g] == x_trial_point[g] 
@@ -233,6 +241,12 @@ class BackwardModelBuilder(ModelBuilder):
         self.copy_constraints_x = None
         self.copy_constraints_y = None
 
+        self.initialize_copy_variables()
+
+    def initialize_copy_variables(self):
+        for g in range(self.n_generators):
+            self.z_x.append(self.model.addVar(vtype = gp.GRB.CONTINUOUS, lb = 0, ub = 1, name = "z_x_%i"%(g+1)))
+            self.z_y.append(self.model.addVar(vtype = gp.GRB.CONTINUOUS, lb = 0, ub = 1, name = "z_y_%i"%(g+1)))
 
     def add_relaxation(self, x_binary_trial_point:list, y_binary_trial_point:list):
         self.bin_copy_vars = []

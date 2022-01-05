@@ -29,7 +29,7 @@ class SddipAlgorithm:
         self.ds_storage = storage.ResultStorage(ResultKeys.dual_solution_keys, "dual_solutions")
         self.cc_storage = storage.ResultStorage(ResultKeys.cut_coefficient_keys, "cut_coefficients")
 
-    def run(self, n_iterations = 10):
+    def run(self, n_iterations = 3):
         print("#### SDDiP-Algorithm started ####")
         self.runtime_logger.start()
         for i in range(n_iterations):
@@ -47,6 +47,7 @@ class SddipAlgorithm:
             ########################################
             forward_pass_start_time = time()
             v_opt_k = self.forward_pass(i, samples)
+            print(v_opt_k)
             self.runtime_logger.log_task_end(f"forward_pass_i{i+1}", forward_pass_start_time)
             
             ########################################
@@ -116,7 +117,7 @@ class SddipAlgorithm:
                         cut_coefficients[ResultKeys.cg_key], cut_coefficients[ResultKeys.bm_key])
                 
                 # Solve problem
-                uc_fw.suppress_output()
+                uc_fw.disable_output()
                 uc_fw.model.optimize()
                 uc_fw.model.printAttr("X")
 
@@ -130,7 +131,6 @@ class SddipAlgorithm:
                 
                 # Value of stage t objective function
                 v_opt_kt = uc_fw.model.getObjective().getValue() - uc_fw.theta.x
-                print(v_opt_kt)
                 v_opt_k[-1] += v_opt_kt
 
                 # New trial point
@@ -222,7 +222,7 @@ class SddipAlgorithm:
                     relaxed_terms = uc_bw.relaxed_terms
                     
                     # Solve problem with subgradient method
-                    uc_bw.suppress_output()            
+                    uc_bw.disable_output()            
                     model, sg_results = self.sg_method.solve(uc_bw.model, objective_terms, relaxed_terms, 10000)
                     model.printAttr("X")
 
@@ -246,7 +246,7 @@ class SddipAlgorithm:
                 if t > 0 : self.cc_storage.add_result(i, k, t-1, cc_dict)
 
     def lower_bound(self, iteration:int):
-        i = iteration
+        i = iteration+1
         t = 0
         n = 0
         
@@ -259,7 +259,7 @@ class SddipAlgorithm:
 
         uc_fw.add_objective(self.params.cost_coeffs)
 
-        uc_fw.add_balance_constraints(self.params.p_d[t][n])
+        uc_fw.add_balance_constraints(sum(self.params.p_d[t][n]))
 
         uc_fw.add_power_flow_constraints(self.params.ptdf, self.params.pl_max, self.params.p_d[t][n])
 
@@ -280,7 +280,7 @@ class SddipAlgorithm:
                 cut_coefficients[ResultKeys.bm_key])
 
         # Solve problem
-        uc_fw.suppress_output()
+        uc_fw.disable_output()
         uc_fw.model.optimize()
         uc_fw.model.printAttr("X")
 

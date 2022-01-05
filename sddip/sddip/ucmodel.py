@@ -195,8 +195,11 @@ class ModelBuilder(ABC):
         self.add_cut_constraints(cut_intercepts, cut_gradients)
 
     
-    def suppress_output(self):
+    def disable_output(self):
         self.model.setParam("OutputFlag", 0)
+
+    def enable_output(self):
+        self.model.setParam("OutputFlag", 1)
 
 
 class ForwardModelBuilder(ModelBuilder):
@@ -245,8 +248,8 @@ class BackwardModelBuilder(ModelBuilder):
 
     def initialize_copy_variables(self):
         for g in range(self.n_generators):
-            self.z_x.append(self.model.addVar(vtype = gp.GRB.CONTINUOUS, lb = 0, ub = 1, name = "z_x_%i"%(g+1)))
-            self.z_y.append(self.model.addVar(vtype = gp.GRB.CONTINUOUS, lb = 0, ub = 1, name = "z_y_%i"%(g+1)))
+            self.z_x.append(self.model.addVar(vtype = gp.GRB.CONTINUOUS, lb = -gp.GRB.INFINITY, name = "z_x_%i"%(g+1)))
+            self.z_y.append(self.model.addVar(vtype = gp.GRB.CONTINUOUS, lb = -gp.GRB.INFINITY, name = "z_y_%i"%(g+1)))
 
     def add_relaxation(self, x_binary_trial_point:list, y_binary_trial_point:list):
         self.bin_copy_vars = []

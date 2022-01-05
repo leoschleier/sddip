@@ -24,10 +24,19 @@ class SddipAlgorithm:
         self.binarizer = utils.Binarizer()
         self.sg_method = dualsolver.SubgradientMethod(max_iterations=100)
 
-        #Result storage
+        # Result storage
         self.ps_storage = storage.ResultStorage(ResultKeys.primal_solution_keys, "primal_solutions")
         self.ds_storage = storage.ResultStorage(ResultKeys.dual_solution_keys, "dual_solutions")
         self.cc_storage = storage.ResultStorage(ResultKeys.cut_coefficient_keys, "cut_coefficients")
+
+        # Initialization
+        self.init_binary_multipliers()
+
+
+    def init_binary_multipliers(self):
+        self.y_bin_multipliers \
+            = [self.binarizer.calc_binary_multipliers_from_precision(ub, precision=0.5) for ub in self.params.pg_max]
+
 
     def run(self, n_iterations = 3):
         print("#### SDDiP-Algorithm started ####")
@@ -58,6 +67,12 @@ class SddipAlgorithm:
             print("Statistical upper bound: {} ".format(v_upper))
             self.runtime_logger.log_task_end(f"upper_bound_i{i+1}", upper_bound_start_time)
 
+            ########################################
+            # Binary approximation refinement
+            ########################################
+            refinement_start_time = time()
+            self.binary_approximation_refinement()
+            self.runtime_logger.log_task_end(f"binary_approximation_refinement_i{i+1}", refinement_start_time)
 
             ########################################
             # Backward pass
@@ -148,6 +163,7 @@ class SddipAlgorithm:
         
         return v_opt_k
     
+
     def statistical_upper_bound(self, v_opt_k:list, n_samples):
         v_mean = np.mean(v_opt_k)
         v_std = np.std(v_opt_k)
@@ -156,6 +172,22 @@ class SddipAlgorithm:
         v_upper = v_mean + stats.norm.ppf(alpha/2)*v_std/np.sqrt(n_samples)
         
         return v_upper
+
+
+    def binary_approximation_refinement(self):
+        # TODO refinement condition
+        # Check if forward pass solution i equals that in i-1
+        refinement_condition = False
+
+        new_multipliers = []
+        if refinement_condition:
+
+            for g in range(self.params.n_gens):
+                n_binaries = len(self.y_bin_multipliers[g]) + 1
+                new_multipliers.append(self.binarizer.calc_binary_multipliers_from_n_binaries(self.params.pg_max[g], n_binaries))
+
+            self.y_bin_multipliers = new_multipliers
+
 
     def backward_pass(self, iteration:int, samples:list):
         i = iteration
@@ -169,27 +201,25 @@ class SddipAlgorithm:
                 
                 for n in range(n_realizations):
 
-                    # TODO Binarization
                     bin_vars = []
-                    bin_multipliers = []
                     if t>0:
-                        float_vars = self.ps_storage.get_result(i,k,t-1)[ResultKeys.y_key]
+                        y_float_vars = self.ps_storage.get_result(i,k,t-1)[ResultKeys.y_key]
                         x_binary_trial_point = self.ps_storage.get_result(i,k,t-1)[ResultKeys.x_key]
                     else:
                         #TODO Approximation needed?
+                        #TODO Initial (x,y)
                         # Might lead to active penalty
-                        float_vars = np.zeros(self.params.n_gens)
+                        y_float_vars = np.zeros(self.params.n_gens)
                         x_binary_trial_point = np.zeros(self.params.n_gens)
                     
-                    for j in range(len(float_vars)):
-                        new_vars, new_multipliers = self.binarizer.binary_expansion(
-                            float_vars[j], upper_bound=self.params.pg_max, precision=0.5)
+                    for j in range(len(y_float_vars)):
+                        new_vars = self.binarizer.binary_expansion_from_multipliers(
+                            y_float_vars[j], self.y_bin_multipliers[j])
                         bin_vars += new_vars
-                        bin_multipliers.append(new_multipliers) 
 
                     # Binarized trial points
                     y_binary_trial_point = bin_vars
-                    y_binary_trial_multipliers = linalg.block_diag(*bin_multipliers)
+                    y_binary_trial_multipliers = linalg.block_diag(*self.y_bin_multipliers)
 
                     # Buzild backward model
                     uc_bw = ucmodel.BackwardModelBuilder(self.params.n_buses, self.params.n_lines, self.params.n_gens, 

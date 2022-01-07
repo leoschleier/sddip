@@ -2,7 +2,7 @@ import os
 import pandas as pd
 
 from datetime import datetime
-from sddip import config
+import config
 
 
 class ResultsManager:

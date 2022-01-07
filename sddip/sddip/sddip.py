@@ -8,11 +8,11 @@ from constants import ResultKeys
 
 import storage
 import utils
-import dualsolver as dualsolver
-import ucmodel as ucmodel
-from parameters import Parameters
-import config
-import logger   
+import dualsolver
+import ucmodel 
+import parameters
+import logger
+import scenarios
 
 
 class SddipAlgorithm:
@@ -20,8 +20,9 @@ class SddipAlgorithm:
     def __init__(self, test_case:str, log_dir:str):
         super().__init__()
         self.runtime_logger = logger.RuntimeLogger(log_dir)
-        self.params = Parameters(test_case)
+        self.params = parameters.Parameters(test_case)
         self.binarizer = utils.Binarizer()
+        self.sc_sampler = scenarios.ScenarioSampler(self.params.n_stages, self.params.n_nodes_per_stage[1])
         self.sg_method = dualsolver.SubgradientMethod(max_iterations=100)
 
         # Result storage
@@ -47,8 +48,8 @@ class SddipAlgorithm:
             ########################################
             # TODO sampling
             sampling_start_time = time()
+            n_samples = 5
             samples = [[0,1], [0,0]]
-            n_samples = len(samples)
             self.runtime_logger.log_task_end(f"sampling_i{i+1}", sampling_start_time)
 
             ########################################

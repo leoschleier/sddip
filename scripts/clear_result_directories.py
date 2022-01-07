@@ -1,8 +1,8 @@
 import sys
-sys.path.append('../sddip')
+sys.path.append('./sddip')
 
 import os, shutil
-from sddip.sddip import config
+from sddip import config
 
 
 for dir in config.result_directories:

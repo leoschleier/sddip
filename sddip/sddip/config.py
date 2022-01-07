@@ -1,6 +1,7 @@
 from pathlib import Path
 import os
 
+# Directories
 config_directory = Path(__file__).parent
 data_dir = os.path.join(config_directory, "../../data")
 
@@ -12,6 +13,10 @@ result_directories = [solver_log_dir, solutions_dir]
 
 data_directories = [test_cases_dir, solver_log_dir, solutions_dir]
 directory_labels = ["Test case", "Solver log", "Solutions"]
+
+# Files
+load_profile_dir = os.path.join(test_cases_dir, "supplementary/load_profiles")
+h0_load_profile_file = os.path.join(load_profile_dir, "h0_summer_workday.txt")
 
 if __name__ == '__main__':
     print("Current directory: {}".format(os.getcwd()))

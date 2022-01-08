@@ -3,8 +3,7 @@ import os
 import numpy as np
 import pandas as pd
 
-import utils
-import config
+from sddip import utils, config
 
 
 class Parameters:
@@ -19,11 +18,11 @@ class Parameters:
         gen_cost_file_raw = os.path.join(test_case_raw_dir, "gen_cost_data.txt")
         scenario_data_file = os.path.join(test_case_raw_dir, "scenario_data.txt")
         # DataFrames
-        self.bus_df = pd.read_csv(bus_file_raw, delimiter="\t")
-        self.branch_df = pd.read_csv(branch_file_raw, delimiter="\t")
-        self.gen_df = pd.read_csv(gen_file_raw, delimiter="\t")
-        self.gen_cost_df = pd.read_csv(gen_cost_file_raw, delimiter="\t")
-        self.scenario_df = pd.read_csv(scenario_data_file, delimiter="\t")
+        self.bus_df = pd.read_csv(bus_file_raw, delimiter="\s+")
+        self.branch_df = pd.read_csv(branch_file_raw, delimiter="\s+")
+        self.gen_df = pd.read_csv(gen_file_raw, delimiter="\s+")
+        self.gen_cost_df = pd.read_csv(gen_cost_file_raw, delimiter="\s+")
+        self.scenario_df = pd.read_csv(scenario_data_file, delimiter="\s+")
         # Parameter initialization
         self.calc_ptdf()
         self.init_deterministic_parameters()

@@ -1,8 +1,9 @@
 import os
 import json
-import config
 from time import time
 from datetime import datetime
+
+from sddip import config
 
 class LogManager:
     def __init__(self):

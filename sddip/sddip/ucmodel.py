@@ -10,8 +10,8 @@ class ModelBuilder(ABC):
         self.n_lines = n_lines
         self.n_generators = n_generators
         self.generators_at_bus = generators_at_bus
-        
         self.model = gp.Model("MILP: Unit commitment")
+        self.model.setParam("OutputFlag", 0)
 
         # Commitment decision
         self.x = []

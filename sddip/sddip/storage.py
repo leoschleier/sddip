@@ -2,7 +2,7 @@ import os
 import pandas as pd
 
 from datetime import datetime
-import config
+from sddip import config
 
 
 class ResultsManager:
@@ -45,4 +45,4 @@ class ResultStorage:
 
     def export_results(self, results_dir:str):
         df = self.to_dataframe()
-        df.to_csv(os.path.join(results_dir, f"{self.label}.csv"))
+        df.to_csv(os.path.join(results_dir, f"{self.label}.csv"), sep="\t")

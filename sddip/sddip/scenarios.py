@@ -2,7 +2,8 @@ from typing import Tuple
 import numpy as np
 import pandas as pd
 import random as rdm
-import config
+
+from sddip import config
 
 
 class ScenarioGenerator:

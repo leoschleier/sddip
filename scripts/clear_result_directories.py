@@ -1,6 +1,3 @@
-import sys
-sys.path.append('./sddip')
-
 import os, shutil
 from sddip import config
 

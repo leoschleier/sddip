@@ -2,11 +2,11 @@ from sddip import algorithm, logger, storage
 
 
 # Parameters
-test_case = "WB3"
+test_case = "LMBM3"
 n_iterations = 3
 n_samples = 30
 init_precision = 0.5
-big_m = 10**18
+big_m = 10 ** 18
 
 
 # Logger

@@ -52,9 +52,7 @@ class Parameters:
 
         ptdf = m1.dot(np.linalg.inv(m2))
 
-        zeros_col = np.zeros((1, ptdf.shape[1]))
-
-        self.ptdf = np.insert(ptdf, ref_bus - 1, zeros_col, axis=1)
+        self.ptdf = np.insert(ptdf, ref_bus - 1, 0, axis=1)
 
         self.n_lines, self.n_buses = self.ptdf.shape
 

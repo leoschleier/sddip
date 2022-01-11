@@ -48,7 +48,6 @@ class ModelBuilder(ABC):
         self.initialize_variables()
 
     def initialize_variables(self):
-        # TODO Default lower bounds
         for g in range(self.n_generators):
             self.x.append(self.model.addVar(vtype=gp.GRB.BINARY, name="x_%i" % (g + 1)))
             self.y.append(
@@ -170,11 +169,14 @@ class ModelBuilder(ABC):
         cut_gradients: list,
         binary_multipliers: list,
         big_m: float = 10 ** 18,
+        sos: bool = False,
     ):
+        r = 0
         for intercept, gradient, multipliers in zip(
             cut_intercepts, cut_gradients, binary_multipliers
         ):
-            self.add_cut(intercept, gradient, multipliers, big_m)
+            self.add_cut(intercept, gradient, multipliers, r, big_m, sos)
+            r += 1
         self.update_model()
 
     def add_cut(
@@ -182,42 +184,52 @@ class ModelBuilder(ABC):
         cut_intercept: float,
         cut_gradient: list,
         y_binary_multipliers: np.array,
+        id: int,
         big_m: float = 10 ** 18,
+        sos: bool = False,
     ):
+
         x_binary_multipliers = linalg.block_diag(*[1] * len(self.x))
 
         binary_multipliers = linalg.block_diag(
             x_binary_multipliers, y_binary_multipliers
         )
 
-        n_var_approximations, n_binaries = y_binary_multipliers.shape
+        n_var_approximations, n_binaries = binary_multipliers.shape
 
-        ny = self.model.addVars(n_binaries, vtype=gp.GRB.CONTINUOUS, lb=0, name="ny")
-        my = self.model.addVars(n_binaries, vtype=gp.GRB.CONTINUOUS, lb=0, name="my")
+        ny = self.model.addVars(
+            n_binaries, vtype=gp.GRB.CONTINUOUS, lb=0, name=f"ny_{id}"
+        )
+        my = self.model.addVars(
+            n_binaries, vtype=gp.GRB.CONTINUOUS, lb=0, name=f"my_{id}"
+        )
         eta = self.model.addVars(
             n_var_approximations,
             vtype=gp.GRB.CONTINUOUS,
             lb=-gp.GRB.INFINITY,
-            name="eta",
+            name=f"eta_{id}",
         )
         lmda = self.model.addVars(
-            n_binaries, vtype=gp.GRB.CONTINUOUS, lb=0, ub=1, name="lambda"
+            n_binaries, vtype=gp.GRB.CONTINUOUS, lb=0, ub=1, name=f"lambda_{id}"
         )
 
         state_vars = self.x + self.y
 
-        w = self.model.addVars(n_binaries, vtype=gp.GRB.BINARY, name="w")
-        u = self.model.addVars(n_binaries, vtype=gp.GRB.BINARY, name="u")
+        w = self.model.addVars(n_binaries, vtype=gp.GRB.BINARY, name=f"w_{id}")
+        u = self.model.addVars(n_binaries, vtype=gp.GRB.BINARY, name=f"u_{id}")
 
         # TODO Define Big-Ms
-        m1 = 1
         m2 = [big_m] * n_binaries
-        m3 = -1
         m4 = [big_m] * n_binaries
 
         # Cut constraint
         self.model.addConstr(
-            (self.theta >= cut_intercept + lmda.prod(cut_gradient)), "cut"
+            (
+                self.theta
+                >= cut_intercept
+                + gp.quicksum(lmda[i] * cut_gradient[i] for i in range(n_binaries))
+            ),
+            f"cut_{id}",
         )
 
         # KKT conditions
@@ -233,7 +245,7 @@ class ModelBuilder(ABC):
                 )
                 for j in range(n_binaries)
             ),
-            "KKT(1)",
+            f"KKT(1)_{id}",
         )
 
         self.model.addConstrs(
@@ -245,23 +257,33 @@ class ModelBuilder(ABC):
                 - state_vars[i]
                 for i in range(n_var_approximations)
             ),
-            "KKT(2)",
+            f"KKT(2)_{id}",
+        )
+
+        if sos:
+            for i in range(n_binaries):
+                self.model.addGenConstrIndicator(w[i], True, ny[i] == 0)
+                self.model.addGenConstrIndicator(u[i], True, my[i] == 0)
+            # self.model.addConstrs(
+            #     ((w[i] == 1) >> (ny[i] == 0) for i in range(n_binaries)), f"KKT(4)_{id}"
+            # )
+            # self.model.addConstrs(
+            #     ((u[i] == 1) >> (my[i] == 0) for i in range(n_binaries)), f"KKT(6)_{id}"
+            # )
+        else:
+            self.model.addConstrs(
+                (ny[i] <= m2[i] * (1 - w[i]) for i in range(n_binaries)), f"KKT(4)_{id}"
+            )
+            self.model.addConstrs(
+                (my[i] <= m4[i] * (1 - u[i]) for i in range(n_binaries)), f"KKT(6)_{id}"
+            )
+
+        self.model.addConstrs(
+            (lmda[i] <= w[i] for i in range(n_binaries)), f"KKT(3)_{id}"
         )
 
         self.model.addConstrs(
-            (lmda[i] <= m1 * w[i] for i in range(n_binaries)), "KKT(3)"
-        )
-
-        self.model.addConstrs(
-            (ny[i] <= m2[i] * (1 - w[i]) for i in range(n_binaries)), "KKT(4)"
-        )
-
-        self.model.addConstrs(
-            (lmda[i] - 1 >= m3 * u[i] for i in range(n_binaries)), "KKT(5)"
-        )
-
-        self.model.addConstrs(
-            (my[i] <= m4[i] * (1 - u[i]) for i in range(n_binaries)), "KKT(6)"
+            (lmda[i] - 1 >= -u[i] for i in range(n_binaries)), f"KKT(5)_{id}"
         )
 
     def remove(self, gurobi_objects):

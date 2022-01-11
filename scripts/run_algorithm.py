@@ -2,11 +2,12 @@ from sddip import algorithm, logger, storage
 
 
 # Parameters
-test_case = "WB3"
+test_case = "WB2"
 n_iterations = 3
 n_samples = 3
 init_precision = 0.5
 big_m = 10 ** 18
+sos = True
 
 
 # Logger
@@ -19,6 +20,7 @@ algo = algorithm.SddipAlgorithm(test_case, log_dir)
 algo.big_m = big_m
 algo.n_samples = n_samples
 algo.init_precision = init_precision
+algo.sos = sos
 algo.run(n_iterations)
 
 

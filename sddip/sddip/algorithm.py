@@ -18,6 +18,7 @@ class SddipAlgorithm:
         self.n_samples = 30
         self.init_precision = 0.5
         self.big_m = 10 ** 18
+        self.sos = False
 
         # Problem specific parameters
         self.problem_params = parameters.Parameters(test_case)
@@ -146,6 +147,8 @@ class SddipAlgorithm:
                         cut_coefficients[ResultKeys.ci_key],
                         cut_coefficients[ResultKeys.cg_key],
                         cut_coefficients[ResultKeys.bm_key],
+                        self.big_m,
+                        self.sos,
                     )
 
                 # Solve problem
@@ -211,8 +214,8 @@ class SddipAlgorithm:
         i = iteration
         n_samples = len(samples)
 
-        for k in range(n_samples):
-            for t in reversed(range(1, self.problem_params.n_stages)):
+        for t in reversed(range(1, self.problem_params.n_stages)):
+            for k in range(n_samples):
                 n_realizations = self.problem_params.n_nodes_per_stage[t]
                 ds_dict = self.ds_storage.create_empty_result_dict()
                 cc_dict = self.cc_storage.create_empty_result_dict()
@@ -270,6 +273,8 @@ class SddipAlgorithm:
                             cut_coefficients[ResultKeys.ci_key],
                             cut_coefficients[ResultKeys.cg_key],
                             cut_coefficients[ResultKeys.bm_key],
+                            self.big_m,
+                            self.sos,
                         )
 
                     objective_terms = uc_bw.objective_terms
@@ -330,6 +335,8 @@ class SddipAlgorithm:
             cut_coefficients[ResultKeys.ci_key],
             cut_coefficients[ResultKeys.cg_key],
             cut_coefficients[ResultKeys.bm_key],
+            self.big_m,
+            self.sos,
         )
 
         # Solve problem

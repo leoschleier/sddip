@@ -58,6 +58,12 @@ class SubgradientMethod:
             # Optimal value
             opt_value = model.getObjective().getValue()
             subgradient = np.array([t.getValue() for t in relaxed_terms])
+            model.setParam("OutputFlag", 1)
+            model.display()
+
+            model.printAttr("X")
+            model.setParam("OutputFlag", 0)
+            print(subgradient)
 
             # Update best lower bound and mutlipliers
             if best_lower_bound <= opt_value:

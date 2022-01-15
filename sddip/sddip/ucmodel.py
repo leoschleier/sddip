@@ -14,6 +14,7 @@ class ModelBuilder(ABC):
         self.generators_at_bus = generators_at_bus
         self.model = gp.Model("MILP: Unit commitment")
         self.model.setParam("OutputFlag", 0)
+        self.model.setParam("InFeasTol", 10 ** (-9))
 
         # Commitment decision
         self.x = []
@@ -197,6 +198,10 @@ class ModelBuilder(ABC):
 
         n_var_approximations, n_binaries = binary_multipliers.shape
 
+        # print(n_var_approximations)
+        # print(n_binaries)
+        # print(binary_multipliers)
+
         ny = self.model.addVars(
             n_binaries, vtype=gp.GRB.CONTINUOUS, lb=0, name=f"ny_{id}"
         )
@@ -223,6 +228,7 @@ class ModelBuilder(ABC):
         m4 = [big_m] * n_binaries
 
         # Cut constraint
+        # print(f"{id}: {cut_gradient}")
         self.model.addConstr(
             (
                 self.theta

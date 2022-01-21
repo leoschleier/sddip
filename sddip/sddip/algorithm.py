@@ -28,7 +28,10 @@ class SddipAlgorithm:
         self.sc_sampler = scenarios.ScenarioSampler(
             self.problem_params.n_stages, self.problem_params.n_nodes_per_stage[1]
         )
-        self.sg_method = dualsolver.SubgradientMethod(max_iterations=100)
+        self.sg_method = dualsolver.SubgradientMethod(
+            max_iterations=100, log_dir=log_dir
+        )
+        self.sg_method.log_flag = False
 
         # Result storage
         self.ps_storage = storage.ResultStorage(
@@ -282,14 +285,25 @@ class SddipAlgorithm:
 
                     # Solve problem with subgradient method
                     uc_bw.disable_output()
+
                     model, sg_results = self.sg_method.solve(
-                        uc_bw.model, objective_terms, relaxed_terms, 10000
+                        uc_bw.model,
+                        objective_terms,
+                        relaxed_terms,
+                        10000,
+                        log_id=f"{i}_{k}_{t}_{n}",
                     )
+
                     model.printAttr("X")
 
                     # Dual value and multiplier for each realization
-                    ds_dict[ResultKeys.dv_key].append(sg_results.obj_value)
-                    ds_dict[ResultKeys.dm_key].append(sg_results.multipliers)
+                    binary_trial_point = x_binary_trial_point + y_binary_trial_point
+                    dual_multipliers = sg_results.multipliers.tolist()
+                    dual_value = sg_results.obj_value - np.array(dual_multipliers).dot(
+                        binary_trial_point
+                    )
+                    ds_dict[ResultKeys.dv_key].append(dual_value)
+                    ds_dict[ResultKeys.dm_key].append(dual_multipliers)
 
                 self.ds_storage.add_result(i, k, t, ds_dict)
 

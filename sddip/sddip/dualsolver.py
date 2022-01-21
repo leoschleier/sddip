@@ -1,5 +1,7 @@
 import gurobipy as gp
 import numpy as np
+import os
+from sddip import logger
 
 
 class SubgradientMethod:
@@ -8,12 +10,18 @@ class SubgradientMethod:
         max_iterations: int = 100,
         tolerance: float = 10 ** (-3),
         initial_lower_bound: float = 0,
+        log_dir: str = None,
     ) -> None:
         self.inital_lower_bound = initial_lower_bound
         self.max_iterations = max_iterations
         self.tolerance = tolerance
         self.results = SolverResults()
+
         self.output_flag = False
+        self.output_verbose = False
+        self.log_flag = False
+
+        self.log_dir = log_dir
 
         # Step size parameters
         self.const_step_size = 1
@@ -22,10 +30,18 @@ class SubgradientMethod:
         self.no_improvement_limit = 10
 
     def solve(
-        self, model: gp.Model, objective_terms, relaxed_terms, upper_bound: float = None
+        self,
+        model: gp.Model,
+        objective_terms,
+        relaxed_terms,
+        upper_bound: float = None,
+        log_id: str = None,
     ) -> gp.Model:
 
         model.setParam("OutputFlag", 0)
+        if self.log_flag:
+            current_log_dir = self.create_subgradient_log_dir(log_id)
+            gurobi_logger = logger.GurobiLogger(current_log_dir)
 
         self.results = SolverResults()
 
@@ -55,18 +71,19 @@ class SubgradientMethod:
             # Optimization
             model.optimize()
 
+            if self.log_flag:
+                gurobi_logger.log_model(
+                    model, str(j).zfill(len(str(self.max_iterations)))
+                )
+
             # Optimal value
             opt_value = model.getObjective().getValue()
             subgradient = np.array([t.getValue() for t in relaxed_terms])
-            model.setParam("OutputFlag", 1)
-            model.display()
 
-            model.printAttr("X")
-            model.setParam("OutputFlag", 0)
-            print(subgradient)
+            self.print_verbose(j, model, dual_multipliers, subgradient)
 
             # Update best lower bound and mutlipliers
-            if best_lower_bound <= opt_value:
+            if best_lower_bound < opt_value:
                 best_lower_bound = opt_value
                 best_multipliers = dual_multipliers
                 no_improvement_counter += 1
@@ -150,6 +167,36 @@ class SubgradientMethod:
     def print_info(self, text: str):
         if self.output_flag:
             print(text)
+
+    def print_verbose(
+        self, iteration: int, model: gp.Model, dual_multipliers: list, subgradient: list
+    ):
+        if self.output_verbose:
+            print()
+            print(f"Iteration {iteration}:")
+            print("-" * 40)
+            model.setParam("OutputFlag", 1)
+
+            print()
+            print(f"Dual multipliers: {dual_multipliers}")
+
+            print()
+            print("Model:")
+            model.display()
+
+            print()
+            print("Optimal point:")
+            model.printAttr("X")
+
+            print()
+            model.setParam("OutputFlag", 0)
+            print(f"Subgradient: {subgradient}")
+            print()
+
+    def create_subgradient_log_dir(self, id: str):
+        dir = os.path.join(self.log_dir, f"{id}_subgradient")
+        os.mkdir(dir)
+        return dir
 
 
 class SolverResults:

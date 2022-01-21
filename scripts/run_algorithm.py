@@ -2,9 +2,9 @@ from sddip import algorithm, logger, storage
 
 
 # Parameters
-test_case = "WB2"
+test_case = "case6ww"
 n_iterations = 3
-n_samples = 3
+n_samples = 2
 init_precision = 0.5
 big_m = 10 ** 18
 sos = True

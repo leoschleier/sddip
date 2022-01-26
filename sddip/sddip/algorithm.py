@@ -16,7 +16,7 @@ class SddipAlgorithm:
 
         # Algorithm paramters
         self.n_samples = 30
-        self.init_precision = 0.5
+        self.n_binaries = 15
         self.big_m = 10 ** 18
         self.sos = False
 
@@ -45,11 +45,11 @@ class SddipAlgorithm:
         )
 
         # Initialization
-        self.init_binary_multipliers(self.init_precision)
+        # self.init_binary_multipliers(self.init_n_binaries)
 
-    def init_binary_multipliers(self, precision=0.5):
+    def init_binary_multipliers(self, n_binaries: int):
         self.y_bin_multipliers = [
-            self.binarizer.calc_binary_multipliers_from_precision(ub, precision)
+            self.binarizer.calc_binary_multipliers_from_n_binaries(ub, n_binaries)
             for ub in self.problem_params.pg_max
         ]
 
@@ -202,16 +202,16 @@ class SddipAlgorithm:
 
         new_multipliers = []
         if refinement_condition:
+            self.n_binaries += 1
+            # for g in range(self.problem_params.n_gens):
+            #     n_binaries = len(self.y_bin_multipliers[g]) + 1
+            #     new_multipliers.append(
+            #         self.binarizer.calc_binary_multipliers_from_n_binaries(
+            #             self.problem_params.pg_max[g], n_binaries
+            #         )
+            #     )
 
-            for g in range(self.problem_params.n_gens):
-                n_binaries = len(self.y_bin_multipliers[g]) + 1
-                new_multipliers.append(
-                    self.binarizer.calc_binary_multipliers_from_n_binaries(
-                        self.problem_params.pg_max[g], n_binaries
-                    )
-                )
-
-            self.y_bin_multipliers = new_multipliers
+            # self.y_bin_multipliers = new_multipliers
 
     def backward_pass(self, iteration: int, samples: list):
         i = iteration
@@ -226,6 +226,7 @@ class SddipAlgorithm:
                 for n in range(n_realizations):
 
                     bin_vars = []
+                    y_bin_multipliers = []
                     if t > 0:
                         y_float_vars = self.ps_storage.get_result(i, k, t - 1)[
                             ResultKeys.y_key
@@ -241,16 +242,20 @@ class SddipAlgorithm:
                         x_binary_trial_point = np.zeros(self.problem_params.n_gens)
 
                     for j in range(len(y_float_vars)):
-                        new_vars = self.binarizer.binary_expansion_from_multipliers(
-                            y_float_vars[j], self.y_bin_multipliers[j]
+                        (
+                            new_vars,
+                            new_multipliers,
+                        ) = self.binarizer.binary_expansion_from_n_binaries(
+                            y_float_vars[j],
+                            self.problem_params.pg_max[j],
+                            self.n_binaries,
                         )
                         bin_vars += new_vars
+                        y_bin_multipliers.append(new_multipliers)
 
                     # Binarized trial points
                     y_binary_trial_point = bin_vars
-                    y_binary_trial_multipliers = linalg.block_diag(
-                        *self.y_bin_multipliers
-                    )
+                    y_binary_trial_multipliers = linalg.block_diag(*y_bin_multipliers)
 
                     # Build backward model
                     uc_bw = ucmodel.BackwardModelBuilder(

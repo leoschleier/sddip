@@ -24,8 +24,15 @@ class Binarizer:
 
         return self.get_best_binary_approximation(x, bin_multipliers)
 
+    def binary_expansion_from_n_binaries(self, x, upper_bound, n_binaries):
+        bin_multipliers = self.calc_binary_multipliers_from_n_binaries(
+            upper_bound, n_binaries
+        )
+
+        return self.get_best_binary_approximation(x, bin_multipliers)
+
     def binary_expansion_from_multipliers(self, x, binary_multipliers):
-        return self.get_best_binary_approximation(x, binary_multipliers)[0]
+        return self.get_best_binary_approximation(x, binary_multipliers)
 
     def get_best_binary_approximation(self, x, binary_multipliers):
         lower_approximation_vars = self.calc_binary_lower_approximation(
@@ -54,7 +61,7 @@ class Binarizer:
             if error_appr_alt < error_appr:
                 best_appr_vars = upper_approximation_vars
 
-        return (list(best_appr_vars), binary_multipliers.tolist())
+        return (list(best_appr_vars), list(binary_multipliers))
 
     def calc_binary_multipliers_from_precision(
         self, upper_bound: float, precision: float

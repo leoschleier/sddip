@@ -24,6 +24,7 @@ class ModelBuilder(ABC):
         # Copy variables
         self.z_x = []
         self.z_y = []
+        self.z_x_bs = []
         # Startup decsision
         self.s_up = []
         # Shutdown decision
@@ -156,6 +157,25 @@ class ModelBuilder(ABC):
             "rate-down",
         )
 
+    def add_up_down_time_constraints(self, min_up_times: list, min_down_times: list):
+        self.model.addConstrs(
+            (
+                gp.quicksum(self.z_x_bs[g]) >= min_up_times[g] * self.s_down[g]
+                for g in range(self.n_generators)
+            ),
+            "up-time",
+        )
+
+        self.model.addConstrs(
+            (
+                len(self.z_x_bs[g]) - gp.quicksum(self.z_x_bs[g])
+                >= min_down_times[g] * self.s_up[g]
+                for g in range(self.n_generators)
+            ),
+            "down-time",
+        )
+
+    # TODO Adjust copy constraints to suit up- and down-time constraints
     @abstractmethod
     def add_copy_constraints(self, x_trial_point: list, y_trial_point):
         pass

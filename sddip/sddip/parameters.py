@@ -7,40 +7,89 @@ from sddip import utils, config
 
 
 class Parameters:
-    def __init__(self, test_case_name: str):
-        raw_dir = os.path.join(test_case_name, "raw")
-        test_case_raw_dir = os.path.join(config.test_cases_dir, raw_dir)
-        # Data files
-        bus_file_raw = os.path.join(test_case_raw_dir, "bus_data.txt")
-        branch_file_raw = os.path.join(test_case_raw_dir, "branch_data.txt")
-        gen_file_raw = os.path.join(test_case_raw_dir, "gen_data.txt")
-        gen_cost_file_raw = os.path.join(test_case_raw_dir, "gen_cost_data.txt")
-        scenario_data_file = os.path.join(test_case_raw_dir, "scenario_data.txt")
+    def __init__(
+        self,
+        test_case_name: str,
+        sub_directory: str = "raw",
+        bus_file="bus_data.txt",
+        branch_file="branch_data.txt",
+        gen_file="gen_data.txt",
+        gen_cost_file="gen_cost_data.txt",
+        scenario_file="scenario_data.txt",
+    ):
+        test_data_dir = os.path.join(test_case_name, sub_directory)
+        test_data_dir = os.path.join(config.test_cases_dir, test_data_dir)
+
+        data_importer = DataImporter(test_data_dir)
+
         # DataFrames
-        self.bus_df = pd.read_csv(bus_file_raw, delimiter="\s+")
-        self.branch_df = pd.read_csv(branch_file_raw, delimiter="\s+")
-        self.gen_df = pd.read_csv(gen_file_raw, delimiter="\s+")
-        self.gen_cost_df = pd.read_csv(gen_cost_file_raw, delimiter="\s+")
-        self.scenario_df = pd.read_csv(scenario_data_file, delimiter="\s+")
-        # Parameter initialization
-        self.calc_ptdf()
-        self.init_deterministic_parameters()
-        self.init_stochastic_parameters()
-        self.init_initial_trial_points()
+        self.bus_df = data_importer.dataframe_from_csv(bus_file)
+        self.branch_df = data_importer.dataframe_from_csv(branch_file)
+        self.gen_df = data_importer.dataframe_from_csv(gen_file)
+        self.gen_cost_df = data_importer.dataframe_from_csv(gen_cost_file)
+        self.scenario_df = data_importer.dataframe_from_csv(scenario_file)
 
-    def calc_ptdf(self):
-        bus_df = self.bus_df
-        branch_df = self.branch_df
+        # Structural data
+        self.ptdf = None
+        self.n_lines = None
+        self.n_buses = None
+        self.n_gens = None
+        self.gens_at_bus = None
 
-        nodes = bus_df.bus_i.values.tolist()
-        edges = branch_df[["fbus", "tbus"]].values.tolist()
+        # Cost data
+        self.gc = None
+        self.suc = None
+        self.sdc = None
+        self.cost_coeffs = None
+
+        # Power generation limits
+        self.pg_min = None
+        self.pg_max = None
+        # Generator ramp rates
+        self.rg_up_max = None
+        self.rg_down_max = None
+
+        # Line capacity
+        self.pl_max = None
+
+        # Stochastic problem parameters
+        self.n_stages = None
+        self.n_nodes_per_stage = None
+
+        # Nodal probability
+        self.prob = None
+        # Power demand
+        self.p_d = None
+        # Cut constraints lower bound
+        self.cut_lb
+        # Frist stage trial points
+        self.init_x_trial_point = None
+        self.init_y_trial_point = None
+
+        self.initialize()
+
+    def initialize(self):
+        """Triggers the initialization of all parameters based on the corresponding data frames
+        """
+        self._calc_ptdf()
+        self._init_deterministic_parameters()
+        self._init_stochastic_parameters()
+        self._init_initial_trial_points()
+
+    def _calc_ptdf(self):
+        """Calculates the Power Transmission Distribution Factor and infers the number of buses and lines
+        """
+        nodes = self.bus_df.bus_i.values.tolist()
+        edges = self.branch_df[["fbus", "tbus"]].values.tolist()
 
         graph = utils.Graph(nodes, edges)
 
-        ref_bus = bus_df.loc[bus_df.type == 3].bus_i.values[0]
+        ref_bus = self.bus_df.loc[self.bus_df.type == 3].bus_i.values[0]
 
         a_inc = graph.incidence_matrix()
-        b_l = (-branch_df.x / (branch_df.r ** 2 + branch_df.x ** 2)).tolist()
+        b_l = (
+            -self.branch_df.x / (self.branch_df.r ** 2 + self.branch_df.x ** 2)
+        ).tolist()
         b_diag = np.diag(b_l)
 
         m1 = b_diag.dot(a_inc)
@@ -56,14 +105,16 @@ class Parameters:
 
         self.n_lines, self.n_buses = self.ptdf.shape
 
-    def init_deterministic_parameters(self):
-        gen_cost_df = self.gen_cost_df
-        gen_df = self.gen_df
-        branch_df = self.branch_df
+    def _init_deterministic_parameters(self):
+        """Initializes all deterministic parameters
+        """
+        self.gen_cost_df
+        self.gen_df
+        self.branch_df
 
-        self.gc = np.array(gen_cost_df.c1)
-        self.suc = np.array(gen_cost_df.startup)
-        self.sdc = np.array(gen_cost_df.startup)
+        self.gc = np.array(self.gen_cost_df.c1)
+        self.suc = np.array(self.gen_cost_df.startup)
+        self.sdc = np.array(self.gen_cost_df.startup)
         # TODO Adjust penalty for slack variables
         self.penalty = 10000
 
@@ -74,9 +125,9 @@ class Parameters:
             + [self.penalty] * 2
         )
 
-        self.pg_min = np.array(gen_df.Pmin)
-        self.pg_max = np.array(gen_df.Pmax)
-        self.pl_max = np.array(branch_df.rateA)
+        self.pg_min = np.array(self.gen_df.Pmin)
+        self.pg_max = np.array(self.gen_df.Pmax)
+        self.pl_max = np.array(self.branch_df.rateA)
 
         self.n_gens = len(self.gc)
 
@@ -92,12 +143,14 @@ class Parameters:
         # Generator 3 is located at bus 3
         gens_at_bus = [[] for _ in range(self.n_buses)]
         g = 0
-        for b in gen_df.bus.values:
+        for b in self.gen_df.bus.values:
             gens_at_bus[b - 1].append(g)
             g += 1
         self.gens_at_bus = gens_at_bus
 
-    def init_stochastic_parameters(self):
+    def _init_stochastic_parameters(self):
+        """Initializes all stochastic parameters
+        """
         scenario_df = self.scenario_df
 
         self.n_nodes_per_stage = scenario_df.groupby("t")["n"].nunique().tolist()
@@ -120,9 +173,22 @@ class Parameters:
         self.prob = prob
         self.p_d = p_d
 
-        # TODO Cut lower bound
         self.cut_lb = [0] * self.n_stages
 
-    def init_initial_trial_points(self):
+    def _init_initial_trial_points(self):
+        """Initializes the first stage trial points
+        """
         self.init_x_trial_point = [0] * self.n_gens
         self.init_y_trial_point = [0] * self.n_gens
+
+
+class DataImporter:
+    def __init__(self, data_directory: str = None):
+        self.data_directory = data_directory if data_directory else ""
+
+    def dataframe_from_csv(
+        self, file_path: str, delimiter: str = "\s+"
+    ) -> pd.DataFrame:
+        path = os.path.join(self.data_directory, file_path)
+        df = pd.read_csv(path, sep=delimiter)
+        return df

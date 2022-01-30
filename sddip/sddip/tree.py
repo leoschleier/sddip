@@ -1,35 +1,66 @@
-class ProblemParameters:
+class Node:
+    def __init__(self, stage: int, index: int, realization: int, parent: "Node" = None):
+        self.stage = stage
+        self.index = index
+        self.realization = realization
+        self.parent = parent
+        self.children = []
 
-    def __init__(self, params=None):
-        self.params = {} if params == None else params
+    def set_children(self, children: list):
+        self.children = children
 
+    def get_ancestors(self, horizon: int = None):
+        n_ancestors = horizon if horizon else self.stage
+        ancestors = []
 
-class RecombiningTree(ProblemParameters):
+        current_node = self
+        for _ in range(n_ancestors):
+            current_node = current_node.parent
+            ancestors.append(current_node)
 
-    def __init__(self, n_nodes_per_stage: list, params=None):
-        super(RecombiningTree, self).__init__(params)
-        self.n_stages = len(n_nodes_per_stage)
-        self.stages = [Stage(i, n_nodes_per_stage[i])
-                       for i in range(self.n_stages)]
-        self.stage_index = 0
-
-    def __iter__(self):
-        return IterableWrapper(self.stages)
-
-    def __reversed__(self):
-        return IterableWrapper(self.stages, True)
-
-    def get_stage(self, stage_num: int):
-        return self.stages[stage_num]
-
-    def get_node(self, stage_num: int, node_num: int):
-        return self.get_stage(stage_num).get_node(node_num)
+        return ancestors
 
 
-class Stage(ProblemParameters):
+class ScenarioTree:
+    def __init__(self, n_realizations_per_stage: list[int]):
+        self.n_stages = len(n_realizations_per_stage)
+        self.n_nodes_per_stage = [1]
+        self.root = Node(0, 0, 0)
+        self.nodes = [[self.root]]
+        self._build_tree(n_realizations_per_stage)
 
+    def _build_tree(self, n_realizations_per_stage: list[int]):
+        for t in range(1, self.n_stages):
+            node_index = 0
+            stage_nodes = []
+            for n in self.nodes[t - 1]:
+                children = []
+                for r in range(n_realizations_per_stage[t]):
+                    children.append(Node(t, node_index, r, n))
+                    node_index += 1
+                n.set_children(children)
+                stage_nodes += children
+            self.nodes.append(stage_nodes)
+
+        self.n_nodes_per_stage = [len(s) for s in self.nodes]
+
+    def __str__(self):
+        total_number_of_nodes = 0
+        for n in self.nodes:
+            total_number_of_nodes += len(n)
+        return (
+            f"ScenarioTree: Stages = {self.n_stages}, Nodes = {total_number_of_nodes}"
+        )
+
+    def get_node(self, stage, index):
+        return self.nodes[stage][index]
+
+    def get_stage_nodes(self, stage):
+        return self.nodes[stage]
+
+
+class Stage:
     def __init__(self, stage_num, n_nodes, params=None):
-        super(Stage, self).__init__(params)
         self.stage_num = stage_num
         self.nodes = [Node(i, self.stage_num) for i in range(n_nodes)]
         self.cut_gradients = []
@@ -45,17 +76,7 @@ class Stage(ProblemParameters):
         return self.nodes[node_num]
 
 
-class Node(ProblemParameters):
-
-    def __init__(self, node_num, stage_num, prob=0., params=None):
-        super(Node, self).__init__(params)
-        self.node_num = node_num
-        self.stage_num = stage_num
-        self.prob = prob
-
-
 class IterableWrapper:
-
     def __init__(self, iterable, reversed=False):
         self.iterable = iterable
         self.reversed = reversed

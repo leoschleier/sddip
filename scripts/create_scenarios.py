@@ -5,9 +5,9 @@ from sddip import config
 
 
 # TODO Select parameters for scenario generation
-test_case_raw_dir = "WB2/raw"
-n_stages = 6
-n_realizations_per_stage = 3
+test_case_raw_dir = "case6ww/raw"
+n_stages = 12
+n_realizations_per_stage = 2
 
 
 # Parameter retrieval

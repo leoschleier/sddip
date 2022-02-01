@@ -15,6 +15,7 @@ class Parameters:
         branch_file="branch_data.txt",
         gen_file="gen_data.txt",
         gen_cost_file="gen_cost_data.txt",
+        gen_sup_file="gen_data_sup.txt",
         scenario_file="scenario_data.txt",
     ):
         test_data_dir = os.path.join(test_case_name, sub_directory)
@@ -27,6 +28,7 @@ class Parameters:
         self.branch_df = data_importer.dataframe_from_csv(branch_file)
         self.gen_df = data_importer.dataframe_from_csv(gen_file)
         self.gen_cost_df = data_importer.dataframe_from_csv(gen_cost_file)
+        self.gen_sup_df = data_importer.dataframe_from_csv(gen_sup_file)
         self.scenario_df = data_importer.dataframe_from_csv(scenario_file)
 
         # Structural data
@@ -46,8 +48,8 @@ class Parameters:
         self.pg_min = None
         self.pg_max = None
         # Generator ramp rates
-        self.rg_up_max = None
-        self.rg_down_max = None
+        self.r_up = None
+        self.r_down = None
         # Min up- and down-times
         self.min_up_times = None
         self.min_down_times = None
@@ -137,12 +139,12 @@ class Parameters:
         self.n_gens = len(self.gc)
 
         # TODO Add ramp rate limits
-        self.rg_up_max = np.full(self.n_gens, 1000)
-        self.rg_down_max = np.full(self.n_gens, 1000)
+        self.r_up = self.gen_sup_df["R_up"].values.tolist()
+        self.r_down = self.gen_sup_df["R_down"].values.tolist()
 
         # TODO add min up and down times to probelm data
-        self.min_up_times = [3] * self.n_gens
-        self.min_down_times = [3] * self.n_gens
+        self.min_up_times = self.gen_sup_df["UT"].values.tolist()
+        self.min_down_times = self.gen_sup_df["DT"].values.tolist()
         self.backsight_periods = [
             max(ut, dt) for ut, dt in zip(self.min_up_times, self.min_down_times)
         ]

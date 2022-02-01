@@ -412,7 +412,7 @@ class SddipAlgorithm:
         model_builder.add_startup_shutdown_constraints()
 
         model_builder.add_ramp_rate_constraints(
-            self.problem_params.rg_up_max, self.problem_params.rg_down_max
+            self.problem_params.r_up, self.problem_params.r_down
         )
 
         model_builder.add_up_down_time_constraints(

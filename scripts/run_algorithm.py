@@ -2,7 +2,7 @@ from sddip import algorithm, logger, storage
 
 
 # Parameters
-test_case = "case6ww"
+test_case = "WB2"
 n_iterations = 3
 n_samples = 2
 init_n_binaries = 15

@@ -122,6 +122,7 @@ class SddipAlgorithm:
 
         x_trial_point = self.problem_params.init_x_trial_point
         y_trial_point = self.problem_params.init_y_trial_point
+        x_bs_trial_point = self.problem_params.init_x_bs_trial_point
 
         for k in range(n_samples):
             v_opt_k.append(0)
@@ -133,16 +134,16 @@ class SddipAlgorithm:
                     self.problem_params.n_lines,
                     self.problem_params.n_gens,
                     self.problem_params.gens_at_bus,
+                    self.problem_params.backsight_periods,
                 )
 
                 uc_fw: ucmodel.ForwardModelBuilder = self.add_problem_constraints(
                     uc_fw, t, n
                 )
 
-                uc_fw.add_copy_constraints(x_trial_point, y_trial_point)
-
-                # TODO Lower bound
-                uc_fw.add_cut_lower_bound(self.problem_params.cut_lb[t])
+                uc_fw.add_copy_constraints(
+                    x_trial_point, y_trial_point, x_bs_trial_point
+                )
 
                 if i > 0:
                     cut_coefficients = self.cc_storage.get_stage_result(t)
@@ -162,10 +163,11 @@ class SddipAlgorithm:
                 # Store xtik, ytik, ztik, vtik
                 x_kt = [x_g.x for x_g in uc_fw.x]
                 y_kt = [y_g.x for y_g in uc_fw.y]
-                z_x_kt = [z_g.x for z_g in uc_fw.z_x]
-                z_y_kt = [z_g.x for z_g in uc_fw.z_y]
-                s_up_kt = [s_up_g.x for s_up_g in uc_fw.s_up]
-                s_down_kt = [s_down_g.x for s_down_g in uc_fw.s_down]
+                x_bs_kt = [[x_bs.x for x_bs in x_bs_g] for x_bs_g in uc_fw.x_bs]
+                # z_x_kt = [z_g.x for z_g in uc_fw.z_x]
+                # z_y_kt = [z_g.x for z_g in uc_fw.z_y]
+                # s_up_kt = [s_up_g.x for s_up_g in uc_fw.s_up]
+                # s_down_kt = [s_down_g.x for s_down_g in uc_fw.s_down]
 
                 # Value of stage t objective function
                 v_opt_kt = uc_fw.model.getObjective().getValue() - uc_fw.theta.x
@@ -175,12 +177,15 @@ class SddipAlgorithm:
                 # TODO trial point contains x and y
                 x_trial_point = x_kt
                 y_trial_point = y_kt
+                x_bs_trial_point = [
+                    [x_trial_point[g]] + x_bs_kt[g][:-1]
+                    for g in range(self.problem_params.n_gens)
+                ]
 
                 ps_dict = self.ps_storage.create_empty_result_dict()
                 ps_dict[ResultKeys.x_key] = x_kt
                 ps_dict[ResultKeys.y_key] = y_kt
-                ps_dict[ResultKeys.z_x_key] = z_x_kt
-                ps_dict[ResultKeys.z_y_key] = z_y_kt
+                ps_dict[ResultKeys.x_bs_key] = x_bs_trial_point
 
                 self.ps_storage.add_result(i, k, t, ps_dict)
 
@@ -234,13 +239,19 @@ class SddipAlgorithm:
                         x_binary_trial_point = self.ps_storage.get_result(i, k, t - 1)[
                             ResultKeys.x_key
                         ]
+                        x_bs_binary_trial_point = self.ps_storage.get_result(
+                            i, k, t - 1
+                        )[ResultKeys.x_bs_key]
                     else:
                         # TODO Approximation needed?
                         # TODO Initial (x,y)
                         # Might lead to active penalty
                         y_float_vars = np.zeros(self.problem_params.n_gens)
                         x_binary_trial_point = np.zeros(self.problem_params.n_gens)
-
+                        x_bs_binary_trial_point = [
+                            [0] * periods
+                            for periods in self.problem_params.backsight_periods
+                        ]
                     for j in range(len(y_float_vars)):
                         (
                             new_vars,
@@ -263,17 +274,20 @@ class SddipAlgorithm:
                         self.problem_params.n_lines,
                         self.problem_params.n_gens,
                         self.problem_params.gens_at_bus,
+                        self.problem_params.backsight_periods,
                     )
 
                     uc_bw: ucmodel.BackwardModelBuilder = self.add_problem_constraints(
                         uc_bw, t, n
                     )
 
-                    uc_bw.add_relaxation(x_binary_trial_point, y_binary_trial_point)
+                    uc_bw.add_relaxation(
+                        x_binary_trial_point,
+                        y_binary_trial_point,
+                        x_bs_binary_trial_point,
+                    )
 
                     uc_bw.add_copy_constraints(y_binary_trial_multipliers)
-
-                    uc_bw.add_cut_lower_bound(self.problem_params.cut_lb[t])
 
                     if t < self.problem_params.n_stages - 1:
                         cut_coefficients = self.cc_storage.get_stage_result(t)
@@ -295,14 +309,22 @@ class SddipAlgorithm:
                         uc_bw.model,
                         objective_terms,
                         relaxed_terms,
-                        10000,
+                        100,
                         log_id=f"{i}_{k}_{t}_{n}",
                     )
 
                     model.printAttr("X")
 
                     # Dual value and multiplier for each realization
-                    binary_trial_point = x_binary_trial_point + y_binary_trial_point
+                    binary_trial_point = (
+                        x_binary_trial_point
+                        + y_binary_trial_point
+                        + [
+                            x_bs_g
+                            for x_bs in x_bs_binary_trial_point
+                            for x_bs_g in x_bs
+                        ]
+                    )
                     dual_multipliers = sg_results.multipliers.tolist()
                     dual_value = sg_results.obj_value - np.array(dual_multipliers).dot(
                         binary_trial_point
@@ -334,6 +356,7 @@ class SddipAlgorithm:
 
         x_trial_point = self.problem_params.init_x_trial_point
         y_trial_point = self.problem_params.init_y_trial_point
+        x_bs_trial_point = self.problem_params.init_x_bs_trial_point
 
         # Create forward model
         uc_fw = ucmodel.ForwardModelBuilder(
@@ -341,13 +364,12 @@ class SddipAlgorithm:
             self.problem_params.n_lines,
             self.problem_params.n_gens,
             self.problem_params.gens_at_bus,
+            self.problem_params.backsight_periods,
         )
 
         uc_fw: ucmodel.ForwardModelBuilder = self.add_problem_constraints(uc_fw, t, n)
 
-        uc_fw.add_copy_constraints(x_trial_point, y_trial_point)
-
-        uc_fw.add_cut_lower_bound(self.problem_params.cut_lb[t])
+        uc_fw.add_copy_constraints(x_trial_point, y_trial_point, x_bs_trial_point)
 
         cut_coefficients = self.cc_storage.get_stage_result(t)
         uc_fw.add_cut_constraints(
@@ -392,5 +414,11 @@ class SddipAlgorithm:
         model_builder.add_ramp_rate_constraints(
             self.problem_params.rg_up_max, self.problem_params.rg_down_max
         )
+
+        model_builder.add_up_down_time_constraints(
+            self.problem_params.min_up_times, self.problem_params.min_down_times
+        )
+
+        model_builder.add_cut_lower_bound(self.problem_params.cut_lb[stage])
 
         return model_builder

@@ -48,6 +48,10 @@ class Parameters:
         # Generator ramp rates
         self.rg_up_max = None
         self.rg_down_max = None
+        # Min up- and down-times
+        self.min_up_times = None
+        self.min_down_times = None
+        self.backsight_periods = None
 
         # Line capacity
         self.pl_max = None
@@ -61,10 +65,11 @@ class Parameters:
         # Power demand
         self.p_d = None
         # Cut constraints lower bound
-        self.cut_lb
+        self.cut_lb = None
         # Frist stage trial points
         self.init_x_trial_point = None
         self.init_y_trial_point = None
+        self.x_bs_init_trial_point = None
 
         self.initialize()
 
@@ -135,6 +140,13 @@ class Parameters:
         self.rg_up_max = np.full(self.n_gens, 1000)
         self.rg_down_max = np.full(self.n_gens, 1000)
 
+        # TODO add min up and down times to probelm data
+        self.min_up_times = [3] * self.n_gens
+        self.min_down_times = [3] * self.n_gens
+        self.backsight_periods = [
+            max(ut, dt) for ut, dt in zip(self.min_up_times, self.min_down_times)
+        ]
+
         # Lists of generators at each bus
         #
         # Example: [[0,1], [], [2]]
@@ -180,6 +192,9 @@ class Parameters:
         """
         self.init_x_trial_point = [0] * self.n_gens
         self.init_y_trial_point = [0] * self.n_gens
+        self.init_x_bs_trial_point = [
+            [0] * n_periods for n_periods in self.backsight_periods
+        ]
 
 
 class DataImporter:

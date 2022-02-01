@@ -51,8 +51,8 @@ class Parameters:
         self.r_up = None
         self.r_down = None
         # Min up- and down-times
-        self.min_up_times = None
-        self.min_down_times = None
+        self.min_up_time = None
+        self.min_down_time = None
         self.backsight_periods = None
 
         # Line capacity
@@ -60,7 +60,7 @@ class Parameters:
 
         # Stochastic problem parameters
         self.n_stages = None
-        self.n_nodes_per_stage = None
+        self.n_realizations_per_stage = None
 
         # Nodal probability
         self.prob = None
@@ -143,10 +143,10 @@ class Parameters:
         self.r_down = self.gen_sup_df["R_down"].values.tolist()
 
         # TODO add min up and down times to probelm data
-        self.min_up_times = self.gen_sup_df["UT"].values.tolist()
-        self.min_down_times = self.gen_sup_df["DT"].values.tolist()
+        self.min_up_time = self.gen_sup_df["UT"].values.tolist()
+        self.min_down_time = self.gen_sup_df["DT"].values.tolist()
         self.backsight_periods = [
-            max(ut, dt) for ut, dt in zip(self.min_up_times, self.min_down_times)
+            max(ut, dt) for ut, dt in zip(self.min_up_time, self.min_down_time)
         ]
 
         # Lists of generators at each bus
@@ -167,8 +167,8 @@ class Parameters:
         """
         scenario_df = self.scenario_df
 
-        self.n_nodes_per_stage = scenario_df.groupby("t")["n"].nunique().tolist()
-        self.n_stages = len(self.n_nodes_per_stage)
+        self.n_realizations_per_stage = scenario_df.groupby("t")["n"].nunique().tolist()
+        self.n_stages = len(self.n_realizations_per_stage)
 
         prob = []
         p_d = []

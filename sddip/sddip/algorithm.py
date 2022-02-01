@@ -26,7 +26,8 @@ class SddipAlgorithm:
         # Helper objects
         self.binarizer = utils.Binarizer()
         self.sc_sampler = scenarios.ScenarioSampler(
-            self.problem_params.n_stages, self.problem_params.n_nodes_per_stage[1]
+            self.problem_params.n_stages,
+            self.problem_params.n_realizations_per_stage[1],
         )
         self.sg_method = dualsolver.SubgradientMethod(
             max_iterations=100, log_dir=log_dir
@@ -224,7 +225,7 @@ class SddipAlgorithm:
 
         for t in reversed(range(1, self.problem_params.n_stages)):
             for k in range(n_samples):
-                n_realizations = self.problem_params.n_nodes_per_stage[t]
+                n_realizations = self.problem_params.n_realizations_per_stage[t]
                 ds_dict = self.ds_storage.create_empty_result_dict()
                 cc_dict = self.cc_storage.create_empty_result_dict()
 
@@ -416,7 +417,7 @@ class SddipAlgorithm:
         )
 
         model_builder.add_up_down_time_constraints(
-            self.problem_params.min_up_times, self.problem_params.min_down_times
+            self.problem_params.min_up_time, self.problem_params.min_down_time
         )
 
         model_builder.add_cut_lower_bound(self.problem_params.cut_lb[stage])

@@ -1,19 +1,31 @@
 import gurobipy as gp
-from sddip import parameters, tree
+from time import time
+from sddip import parameters, tree, logger
 
 test_case_name = "WB2"
 
+log_manager = logger.LogManager()
+log_dir = log_manager.create_log_dir(f"{test_case_name}_ext")
+runtime_logger = logger.RuntimeLogger(log_dir)
+
+runtime_logger.start()
 
 print("Building the model...")
 
 params = parameters.Parameters(test_case_name)
 
+scenario_tree_construction_start_time = time()
 scenario_tree = tree.ScenarioTree(params.n_realizations_per_stage)
+runtime_logger.log_task_end(
+    "scenario_tree_construction", scenario_tree_construction_start_time
+)
 print(scenario_tree)
+
 
 ########################################################################################################################
 # Variables initialization
 ########################################################################################################################
+model_building_start_time = time()
 
 model = gp.Model("MSUC")
 
@@ -247,16 +259,19 @@ for g in range(params.n_gens):
 
 model.update()
 
+runtime_logger.log_task_end(f"model_building", model_building_start_time)
 
 ########################################################################################################################
 # Solving procedure
 ########################################################################################################################
 model.setParam("OutputFlag", 0)
 
-print()
 print("Solving process started...")
-
+model_solving_start_time = time()
 model.optimize()
+runtime_logger.log_task_end("model_solving", model_solving_start_time)
+
 print("Solving finished.")
-print()
 print(f"Optimal value: {obj.getValue()}")
+
+runtime_logger.log_experiment_end()

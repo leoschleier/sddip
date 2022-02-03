@@ -1,5 +1,6 @@
 import gurobipy as gp
 import numpy as np
+from time import time
 import os
 from sddip import logger
 
@@ -21,6 +22,11 @@ class SubgradientMethod:
         self.output_verbose = False
         self.log_flag = False
 
+        log_manager = logger.LogManager()
+        runtime_log_dir = log_manager.create_log_dir("sg_log")
+        self.runtime_logger = logger.RuntimeLogger(runtime_log_dir)
+        self.n_calls = 0
+
         self.log_dir = log_dir
 
         # Step size parameters
@@ -37,6 +43,9 @@ class SubgradientMethod:
         upper_bound: float = None,
         log_id: str = None,
     ) -> gp.Model:
+
+        self.n_calls += 1
+        subgradient_start_time = time()
 
         model.setParam("OutputFlag", 0)
         if self.log_flag:
@@ -111,6 +120,10 @@ class SubgradientMethod:
 
         stop_reason = "Tolerance" if tolerance_reached else "Max iterations"
         self.print_info(f"Subgradient Method finished ({stop_reason})")
+
+        self.runtime_logger.log_task_end(
+            f"subgradient_method_{self.n_calls}", subgradient_start_time
+        )
 
         self.results.set_values(best_lower_bound, best_multipliers)
         return (model, self.results)

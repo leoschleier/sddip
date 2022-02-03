@@ -57,6 +57,7 @@ class SddipAlgorithm:
     def run(self, n_iterations: int):
         print("#### SDDiP-Algorithm started ####")
         self.runtime_logger.start()
+        self.sg_method.runtime_logger.start()
         for i in range(n_iterations):
             ########################################
             # Sampling
@@ -114,6 +115,7 @@ class SddipAlgorithm:
             )
 
         self.runtime_logger.log_experiment_end()
+        self.sg_method.runtime_logger.log_experiment_end()
         print("#### SDDiP-Algorithm finished ####")
 
     def forward_pass(self, iteration: int, samples: list) -> list:

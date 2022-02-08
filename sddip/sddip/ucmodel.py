@@ -10,13 +10,17 @@ class ModelBuilder(ABC):
         n_buses: int,
         n_lines: int,
         n_generators: int,
+        n_storages: int,
         generators_at_bus: list,
+        storages_at_bus: list,
         backsight_periods: list,
     ) -> None:
         self.n_buses = n_buses
         self.n_lines = n_lines
         self.n_generators = n_generators
+        self.n_storages = n_storages
         self.generators_at_bus = generators_at_bus
+        self.storages_at_bus = storages_at_bus
         self.backsight_periods = backsight_periods
         self.model = gp.Model("MILP: Unit commitment")
         self.model.setParam("OutputFlag", 0)
@@ -30,10 +34,17 @@ class ModelBuilder(ABC):
         # Generator state backsight variables
         # Given current stage t, x_bs[g][k] is the state of generator g at stage (t-k-1)
         self.x_bs = []
+        # Storage charge/discharge
+        self.ys_c = []
+        self.ys_dc = []
+        # Switch variable
+        self.u_c_dc = []
+        self.soc = []
         # Copy variables
         self.z_x = []
         self.z_y = []
         self.z_x_bs = []
+        self.z_soc = []
         # Startup decsision
         self.s_up = []
         # Shutdown decision
@@ -69,7 +80,7 @@ class ModelBuilder(ABC):
             self.x_bs.append(
                 [
                     self.model.addVar(
-                        vtype=gp.GRB.BINARY, name="x_bs%i_%i" % (g + 1, k + 1),
+                        vtype=gp.GRB.BINARY, name="x_bs_%i_%i" % (g + 1, k + 1),
                     )
                     for k in range(self.backsight_periods[g])
                 ]
@@ -79,6 +90,17 @@ class ModelBuilder(ABC):
             )
             self.s_down.append(
                 self.model.addVar(vtype=gp.GRB.BINARY, name="s_down_%i" % (g + 1))
+            )
+        for s in range(self.n_storages):
+            self.ys_c.append(
+                self.model.addVar(vtype=gp.GRB.CONTINUOUS, lb=0, name=f"y_c_{s+1}")
+            )
+            self.ys_dc.append(
+                self.model.addVar(vtype=gp.GRB.CONTINUOUS, lb=0, name=f"y_dc_{s+1}")
+            )
+            self.u_c_dc.append(self.model.addVar(vtype=gp.GRB.BINARY, name=f"u_{s+1}"))
+            self.soc.append(
+                self.model.addVar(vtype=gp.GRB.CONTINUOUS, lb=0, name=f"soc_{s+1}")
             )
         self.theta = self.model.addVar(
             vtype=gp.GRB.CONTINUOUS, lb=-gp.GRB.INFINITY, name="theta"
@@ -108,10 +130,18 @@ class ModelBuilder(ABC):
                     self.model.addVar(
                         vtype=gp.GRB.CONTINUOUS,
                         lb=-gp.GRB.INFINITY,
-                        name="z_x_bs%i_%i" % (g + 1, k + 1),
+                        name="z_x_bs_%i_%i" % (g + 1, k + 1),
                     )
                     for k in range(self.backsight_periods[g])
                 ]
+            )
+        for s in range(self.n_storages):
+            self.z_soc.append(
+                self.model.addVar(
+                    vtype=gp.GRB.CONTINUOUS,
+                    lb=-gp.GRB.INFINITY,
+                    name="z_soc_%i" % (s + 1),
+                )
             )
         self.model.update()
 
@@ -124,9 +154,22 @@ class ModelBuilder(ABC):
         self.model.setObjective(self.objective_terms)
         self.update_model()
 
-    def add_balance_constraints(self, total_demand: float):
+    def add_balance_constraints(
+        self,
+        total_demand: float,
+        total_renewable_generation: float,
+        discharge_eff: list,
+    ):
         self.balance_constraints = self.model.addConstr(
-            gp.quicksum(self.y) + self.ys_p - self.ys_n == total_demand, "balance"
+            gp.quicksum(self.y)
+            + gp.quicksum(
+                discharge_eff[s] * self.ys_dc[s] - self.ys_c[s]
+                for s in range(self.n_storages)
+            )
+            + self.ys_p
+            - self.ys_n
+            == total_demand - total_renewable_generation,
+            "balance",
         )
         self.update_model()
 
@@ -147,13 +190,58 @@ class ModelBuilder(ABC):
         )
         self.update_model()
 
-    def add_power_flow_constraints(self, ptdf, max_line_capacities: list, demand: list):
+    def add_storage_constraints(
+        self, max_charge_rate: list, max_discharge_rate: list, max_soc: list
+    ):
+        self.model.addConstrs(
+            (
+                self.ys_c[s] <= max_charge_rate[s] * self.u_c_dc[s]
+                for s in range(self.n_storages)
+            ),
+            "max-charge-rate",
+        )
+
+        self.model.addConstrs(
+            (
+                self.ys_dc[s] <= max_discharge_rate[s] * (1 - self.u_c_dc[s])
+                for s in range(self.n_storages)
+            ),
+            "max-discharge-rate",
+        )
+
+        self.model.addConstrs(
+            (self.soc[s] <= max_soc[s] for s in range(self.n_storages)), "max-soc",
+        )
+
+    def add_soc_transfer(self, charge_eff: list):
+        self.model.addConstrs(
+            (
+                self.soc[s]
+                == self.z_soc[s] + charge_eff[s] * self.ys_c[s] - self.ys_dc[s]
+                for s in range(self.n_storages)
+            ),
+            "soc",
+        )
+
+    def add_power_flow_constraints(
+        self,
+        ptdf,
+        max_line_capacities: list,
+        demand: list,
+        renewable_generation: list,
+        discharge_eff: list,
+    ):
         line_flows = [
             gp.quicksum(
                 ptdf[l, b]
                 * (
                     gp.quicksum(self.y[g] for g in self.generators_at_bus[b])
+                    + gp.quicksum(
+                        discharge_eff[s] * self.ys_dc[s] - self.ys_c[s]
+                        for s in self.storages_at_bus[b]
+                    )
                     - demand[b]
+                    + renewable_generation[b]
                 )
                 for b in range(self.n_buses)
             )
@@ -228,7 +316,9 @@ class ModelBuilder(ABC):
 
     # TODO Adjust copy constraints to suit up- and down-time constraints
     @abstractmethod
-    def add_copy_constraints(self, x_trial_point: list, y_trial_point):
+    def add_copy_constraints(
+        self, x_trial_point: list, y_trial_point: list, soc_trial_point: list
+    ):
         pass
 
     def add_cut_lower_bound(self, lower_bound: float):
@@ -240,15 +330,18 @@ class ModelBuilder(ABC):
         self,
         cut_intercepts: list,
         cut_gradients: list,
-        binary_multipliers: list,
+        y_binary_multipliers: list,
+        soc_binary_multipliers: list,
         big_m: float = 10 ** 18,
         sos: bool = False,
     ):
         r = 0
-        for intercept, gradient, multipliers in zip(
-            cut_intercepts, cut_gradients, binary_multipliers
+        for intercept, gradient, y_multipliers, soc_multipliers in zip(
+            cut_intercepts, cut_gradients, y_binary_multipliers, soc_binary_multipliers
         ):
-            self.add_cut(intercept, gradient, multipliers, r, big_m, sos)
+            self.add_cut(
+                intercept, gradient, y_multipliers, soc_multipliers, r, big_m, sos
+            )
             r += 1
         self.update_model()
 
@@ -257,6 +350,7 @@ class ModelBuilder(ABC):
         cut_intercept: float,
         cut_gradient: list,
         y_binary_multipliers: np.array,
+        soc_binary_multipliers: np.array,
         id: int,
         big_m: float = 10 ** 18,
         sos: bool = False,
@@ -267,7 +361,10 @@ class ModelBuilder(ABC):
         x_bs_binary_multipliers = linalg.block_diag(*[1] * n_total_backsight_variables)
 
         binary_multipliers = linalg.block_diag(
-            x_binary_multipliers, y_binary_multipliers, x_bs_binary_multipliers
+            x_binary_multipliers,
+            y_binary_multipliers,
+            x_bs_binary_multipliers,
+            soc_binary_multipliers,
         )
 
         n_var_approximations, n_binaries = binary_multipliers.shape
@@ -292,6 +389,7 @@ class ModelBuilder(ABC):
             self.x
             + self.y
             + [variable for bs_vars in self.x_bs for variable in bs_vars]
+            + self.soc
         )
 
         w = self.model.addVars(n_binaries, vtype=gp.GRB.BINARY, name=f"w_{id}")
@@ -387,15 +485,27 @@ class ForwardModelBuilder(ModelBuilder):
         n_buses: int,
         n_lines: int,
         n_generators: int,
+        n_storages: int,
         generators_at_bus: list,
+        storages_at_bus: list,
         backsight_periods: list,
     ) -> None:
         super().__init__(
-            n_buses, n_lines, n_generators, generators_at_bus, backsight_periods
+            n_buses,
+            n_lines,
+            n_generators,
+            n_storages,
+            generators_at_bus,
+            storages_at_bus,
+            backsight_periods,
         )
 
     def add_copy_constraints(
-        self, x_trial_point: list, y_trial_point: list, x_bs_trial_point: list[list]
+        self,
+        x_trial_point: list,
+        y_trial_point: list,
+        x_bs_trial_point: list[list],
+        soc_trial_point: list,
     ):
         self.copy_constraints_y = self.model.addConstrs(
             (self.z_x[g] == x_trial_point[g] for g in range(self.n_generators)),
@@ -413,6 +523,10 @@ class ForwardModelBuilder(ModelBuilder):
             ),
             "copy-x-bs",
         )
+        self.copy_constraints_soc = self.model.addConstrs(
+            (self.z_soc[s] == soc_trial_point[s] for s in range(self.n_storages)),
+            "copy-soc",
+        )
         self.update_model()
 
 
@@ -422,16 +536,25 @@ class BackwardModelBuilder(ModelBuilder):
         n_buses: int,
         n_lines: int,
         n_generators: int,
+        n_storages: int,
         generators_at_bus: list,
+        storages_at_bus: list,
         backsight_periods: list,
     ) -> None:
         super().__init__(
-            n_buses, n_lines, n_generators, generators_at_bus, backsight_periods
+            n_buses,
+            n_lines,
+            n_generators,
+            n_storages,
+            generators_at_bus,
+            storages_at_bus,
+            backsight_periods,
         )
 
         self.n_x_trial_binaries = None
         self.n_y_trial_binaries = None
         self.n_x_bs_trial_binaries = None
+        self.n_soc_trial_binaries = None
 
         self.relaxed_terms = []
 
@@ -439,16 +562,20 @@ class BackwardModelBuilder(ModelBuilder):
         self.x_bin_copy_vars = []
         self.y_bin_copy_vars = []
         self.x_bs_bin_copy_vars = []
+        self.soc_bin_copy_vars = []
 
         # Copy constraints
         self.copy_constraints_x = None
         self.copy_constraints_y = None
+        self.copy_constraints_x_bs = None
+        self.copy_constraints_soc = None
 
     def add_relaxation(
         self,
         x_binary_trial_point: list,
         y_binary_trial_point: list,
         x_bs_binary_trial_point: list[list],
+        soc_binary_trial_point: list,
     ):
         self.bin_copy_vars = []
         self.n_x_trial_binaries = len(x_binary_trial_point)
@@ -456,6 +583,7 @@ class BackwardModelBuilder(ModelBuilder):
         self.n_x_bs_trial_binaries = [
             len(trial_point) for trial_point in x_bs_binary_trial_point
         ]
+        self.n_soc_trial_binaries = len(soc_binary_trial_point)
 
         for j in range(self.n_x_trial_binaries):
             self.x_bin_copy_vars.append(
@@ -477,6 +605,7 @@ class BackwardModelBuilder(ModelBuilder):
                 )
             )
 
+        j=0
         for n_vars in self.n_x_bs_trial_binaries:
             self.x_bs_bin_copy_vars.append(
                 [
@@ -484,19 +613,36 @@ class BackwardModelBuilder(ModelBuilder):
                         vtype=gp.GRB.CONTINUOUS,
                         lb=0,
                         ub=1,
-                        name="x_bs_bin_copy_var_%i" % (j + 1),
+                        name="x_bs_bin_copy_var_%i" % (k + 1),
                     )
-                    for _ in range(n_vars)
+                    for k in range(j, j+n_vars)
                 ]
             )
+            j+=n_vars
 
-        self.relax(x_binary_trial_point, y_binary_trial_point, x_bs_binary_trial_point)
+        for j in range(self.n_soc_trial_binaries):
+            self.soc_bin_copy_vars.append(
+                self.model.addVar(
+                    vtype=gp.GRB.CONTINUOUS,
+                    lb=0,
+                    ub=1,
+                    name="soc_bin_copy_var_%i" % (j + 1),
+                )
+            )
+
+        self.relax(
+            x_binary_trial_point,
+            y_binary_trial_point,
+            x_bs_binary_trial_point,
+            soc_binary_trial_point,
+        )
 
     def relax(
         self,
         x_binary_trial_point: list,
         y_binary_trial_point: list,
         x_bs_binary_trial_point: list[list],
+        soc_binary_trial_point: list,
     ):
         self.check_bin_copy_vars_not_empty()
 
@@ -516,10 +662,20 @@ class BackwardModelBuilder(ModelBuilder):
             for k in range(self.n_x_bs_trial_binaries[g])
         ]
 
-    def add_copy_constraints(self, y_binary_trial_multipliers: np.array):
+        self.relaxed_terms += [
+            soc_binary_trial_point[j] - self.soc_bin_copy_vars[j]
+            for j in range(self.n_soc_trial_binaries)
+        ]
+
+    def add_copy_constraints(
+        self,
+        y_binary_trial_multipliers: np.array,
+        soc_binary_trial_multipliers: np.array,
+    ):
         self.check_bin_copy_vars_not_empty()
 
         n_y_var_approximations, n_y_binaries = y_binary_trial_multipliers.shape
+        n_soc_var_approximations, n_soc_binaries = soc_binary_trial_multipliers.shape
 
         self.copy_constraints_y = self.model.addConstrs(
             (
@@ -550,10 +706,24 @@ class BackwardModelBuilder(ModelBuilder):
             "copy-x-bs",
         )
 
+        self.copy_constraints_soc = self.model.addConstrs(
+            (
+                self.z_soc[i]
+                == gp.quicksum(
+                    soc_binary_trial_multipliers[i, j] * self.soc_bin_copy_vars[j]
+                    for j in range(n_soc_binaries)
+                )
+                for i in range(n_soc_var_approximations)
+            ),
+            "copy-soc",
+        )
         self.update_model()
 
     def check_bin_copy_vars_not_empty(self):
         if not (
-            self.x_bin_copy_vars and self.y_bin_copy_vars and self.x_bs_bin_copy_vars
+            self.x_bin_copy_vars
+            and self.y_bin_copy_vars
+            and self.x_bs_bin_copy_vars
+            and self.soc_bin_copy_vars
         ):
             raise ValueError("Copy variable does not exist. Call add_relaxation first.")

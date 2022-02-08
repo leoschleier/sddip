@@ -56,6 +56,7 @@ class SubgradientMethod:
 
         gradient_len = len(relaxed_terms)
         dual_multipliers = np.zeros(gradient_len)
+        # dual_multipliers = np.full(gradient_len, 10000)
 
         best_lower_bound = self.inital_lower_bound
         best_multipliers = dual_multipliers

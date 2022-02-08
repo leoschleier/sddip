@@ -16,6 +16,8 @@ class Parameters:
         gen_file="gen_data.txt",
         gen_cost_file="gen_cost_data.txt",
         gen_sup_file="gen_data_sup.txt",
+        renewables_file="ren_data.txt",
+        storage_file="storage_data.txt",
         scenario_file="scenario_data.txt",
     ):
         test_data_dir = os.path.join(test_case_name, sub_directory)
@@ -29,6 +31,8 @@ class Parameters:
         self.gen_df = data_importer.dataframe_from_csv(gen_file)
         self.gen_cost_df = data_importer.dataframe_from_csv(gen_cost_file)
         self.gen_sup_df = data_importer.dataframe_from_csv(gen_sup_file)
+        self.ren_df = data_importer.dataframe_from_csv(renewables_file)
+        self.storage_df = data_importer.dataframe_from_csv(storage_file)
         self.scenario_df = data_importer.dataframe_from_csv(scenario_file)
 
         # Structural data
@@ -37,6 +41,8 @@ class Parameters:
         self.n_buses = None
         self.n_gens = None
         self.gens_at_bus = None
+        self.n_storages = None
+        self.storages_at_bus = None
 
         # Cost data
         self.gc = None
@@ -54,6 +60,14 @@ class Parameters:
         self.min_up_time = None
         self.min_down_time = None
         self.backsight_periods = None
+        # Storage charge/discharge rate limits
+        self.rc_max = None
+        self.rdc_min = None
+        # Maximum state of charge
+        self.soc_max = None
+        # Charge/discharge efficiencies
+        self.eff_c = None
+        self.eff_dc = None
 
         # Line capacity
         self.pl_max = None
@@ -66,12 +80,15 @@ class Parameters:
         self.prob = None
         # Power demand
         self.p_d = None
+        # Renewable generation
+        self.re = None
         # Cut constraints lower bound
         self.cut_lb = None
         # Frist stage trial points
         self.init_x_trial_point = None
         self.init_y_trial_point = None
-        self.x_bs_init_trial_point = None
+        self.init_x_bs_trial_point = None
+        self.init_soc_trial_point = None
 
         self.initialize()
 
@@ -123,7 +140,7 @@ class Parameters:
         self.suc = np.array(self.gen_cost_df.startup)
         self.sdc = np.array(self.gen_cost_df.startup)
         # TODO Adjust penalty for slack variables
-        self.penalty = 10000
+        self.penalty = 1000
 
         self.cost_coeffs = (
             self.gc.tolist()
@@ -155,12 +172,29 @@ class Parameters:
         # Generator 1 & 2 are located at bus 1
         # No Generator is located at bus 2
         # Generator 3 is located at bus 3
+        gen_buses = self.gen_df.bus.values.tolist()
         gens_at_bus = [[] for _ in range(self.n_buses)]
         g = 0
-        for b in self.gen_df.bus.values:
+        for b in gen_buses:
             gens_at_bus[b - 1].append(g)
             g += 1
         self.gens_at_bus = gens_at_bus
+
+        # Storages
+        storage_buses = self.storage_df.bus.values.tolist()
+        self.n_storages = len(storage_buses)
+        self.storages_at_bus = [[] for _ in range(self.n_buses)]
+        s = 0
+        for b in storage_buses:
+            self.storages_at_bus[b - 1].append(s)
+            s += 1
+
+        self.rc_max = self.storage_df["Rc"].values.tolist()
+        self.rdc_max = self.storage_df["Rdc"].values.tolist()
+        self.soc_max = self.storage_df["SOC"].values.tolist()
+
+        self.eff_c = self.storage_df["Effc"].values.tolist()
+        self.eff_dc = self.storage_df["Effdc"].values.tolist()
 
     def _init_stochastic_parameters(self):
         """Initializes all stochastic parameters
@@ -172,6 +206,7 @@ class Parameters:
 
         prob = []
         p_d = []
+        re = []
 
         for t in range(self.n_stages):
             stage_df = scenario_df[scenario_df["t"] == t + 1]
@@ -182,10 +217,18 @@ class Parameters:
                     ]
                 ].values.tolist()
             )
+            re.append(
+                stage_df[
+                    scenario_df.columns[
+                        scenario_df.columns.to_series().str.contains("Re")
+                    ]
+                ].values.tolist()
+            )
             prob.append(stage_df["p"].values.tolist())
 
         self.prob = prob
         self.p_d = p_d
+        self.re = re
 
         self.cut_lb = [0] * self.n_stages
 
@@ -197,6 +240,7 @@ class Parameters:
         self.init_x_bs_trial_point = [
             [0] * n_periods for n_periods in self.backsight_periods
         ]
+        self.init_soc_trial_point = [0.5 * soc for soc in self.soc_max]
 
 
 class DataImporter:

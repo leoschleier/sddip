@@ -4,7 +4,7 @@ from sddip import algorithm, logger, storage
 # Parameters
 test_case = "WB2"
 n_iterations = 3
-n_samples = 2
+n_samples = 10
 init_n_binaries = 15
 big_m = 10 ** 18
 sos = True
@@ -19,8 +19,9 @@ log_dir = log_manager.create_log_dir("log")
 algo = algorithm.SddipAlgorithm(test_case, log_dir)
 algo.big_m = big_m
 algo.n_samples = n_samples
-algo.init_n_binaries = init_n_binaries
+algo.n_binaries = init_n_binaries
 algo.sos = sos
+# algo.sg_method.output_flag = True
 algo.run(n_iterations)
 
 

@@ -60,6 +60,7 @@ class SubgradientMethod:
 
         best_lower_bound = self.inital_lower_bound
         best_multipliers = dual_multipliers
+        lowest_gm = 100
 
         no_improvement_counter = 0
 
@@ -92,6 +93,12 @@ class SubgradientMethod:
 
             self.print_verbose(j, model, dual_multipliers, subgradient)
 
+            gradient_magnitude = np.linalg.norm(subgradient, 2)
+
+            lowest_gm = (
+                gradient_magnitude if gradient_magnitude < lowest_gm else lowest_gm
+            )
+
             # Update best lower bound and mutlipliers
             if best_lower_bound < opt_value:
                 best_lower_bound = opt_value
@@ -101,7 +108,6 @@ class SubgradientMethod:
                 no_improvement_counter = 0
 
             # Check Stopping criteria
-            gradient_magnitude = np.linalg.norm(subgradient, 2)
             if gradient_magnitude <= self.tolerance:
                 tolerance_reached = True
                 self.print_iteration_info(j, opt_value, gradient_magnitude)
@@ -120,7 +126,7 @@ class SubgradientMethod:
             self.print_iteration_info(j, opt_value, gradient_magnitude, step_size)
 
         stop_reason = "Tolerance" if tolerance_reached else "Max iterations"
-        self.print_info(f"Subgradient Method finished ({stop_reason})")
+        print(f"Subgradient Method finished ({stop_reason}, {lowest_gm})")
 
         self.runtime_logger.log_task_end(
             f"subgradient_method_{self.n_calls}", subgradient_start_time

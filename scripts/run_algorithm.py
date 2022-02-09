@@ -5,7 +5,7 @@ from sddip import algorithm, logger, storage
 test_case = "WB2"
 n_iterations = 3
 n_samples = 10
-init_n_binaries = 15
+init_n_binaries = 10
 big_m = 10 ** 18
 sos = True
 

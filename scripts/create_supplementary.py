@@ -4,9 +4,10 @@ import pandas as pd
 from sddip import config
 
 # TODO Select parameters for data generation
-test_case_raw_dir = "WB2/raw"
+test_case_raw_dir = "case6ww/raw"
 
-# Ramp rate (%/100 of rated capacity per unit time)
+# Ramp rate
+# (%/100 of rated capacity per unit time)
 ramp_rate = 0.5
 # Min up/-down time
 up_down_factor = 4
@@ -16,7 +17,7 @@ test_case_raw_dir = os.path.join(config.test_cases_dir, test_case_raw_dir)
 
 gen_file = os.path.join(test_case_raw_dir, "gen_data.txt")
 scenario_file = os.path.join(test_case_raw_dir, "scenario_data.txt")
-supplementary_file_path = os.path.join(test_case_raw_dir, "gen_data_sup.txt")
+supplementary_file_path = os.path.join(test_case_raw_dir, "gen_sup_data.txt")
 
 gen_df = pd.read_csv(gen_file, delimiter="\s+")
 scenario_df = pd.read_csv(scenario_file, delimiter="\s+")

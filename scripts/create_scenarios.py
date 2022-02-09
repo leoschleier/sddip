@@ -7,7 +7,7 @@ from sddip import config
 # TODO Select parameters for scenario generation
 test_case_raw_dir = "WB2/raw"
 n_stages = 3
-n_realizations_per_stage = 2
+n_realizations_per_stage = 3
 
 
 # Parameter retrieval
@@ -48,7 +48,7 @@ demand_scenario_df = sc_generator.generate_demand_scenario_dataframe(
 
 # Renewables scenarios
 renewables_scenario_df = sc_generator.generate_renewables_scenario_dataframe(
-    n_buses, renewables_buses, re_base_values, max_relative_variation=0.9
+    n_buses, renewables_buses, re_base_values, max_relative_variation=0.5
 )
 renewables_scenario_df.drop(["t", "n", "p"], axis=1, inplace=True)
 

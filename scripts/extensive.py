@@ -82,8 +82,8 @@ model.update()
 # Objective
 conditional_probabilities = []
 p = 1
-for n in scenario_tree.n_nodes_per_stage:
-    p = p * 1 / n
+for n in range(scenario_tree.n_stages):
+    p = p * 1 / params.n_realizations_per_stage[n]
     conditional_probabilities.append(p)
 
 obj = gp.quicksum(

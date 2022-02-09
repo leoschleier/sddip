@@ -32,7 +32,7 @@ class SddipAlgorithm:
             self.problem_params.n_realizations_per_stage[1],
         )
         self.sg_method = dualsolver.SubgradientMethod(
-            max_iterations=100, log_dir=log_dir
+            max_iterations=1000, log_dir=log_dir
         )
         self.sg_method.log_flag = False
 
@@ -64,6 +64,7 @@ class SddipAlgorithm:
         print("#### SDDiP-Algorithm started ####")
         self.runtime_logger.start()
         self.sg_method.runtime_logger.start()
+        lower_bounds = [0]
         for i in range(n_iterations):
             ########################################
             # Sampling
@@ -96,7 +97,7 @@ class SddipAlgorithm:
             # Binary approximation refinement
             ########################################
             refinement_start_time = time()
-            self.binary_approximation_refinement()
+            self.binary_approximation_refinement(i, lower_bounds)
             self.runtime_logger.log_task_end(
                 f"binary_approximation_refinement_i{i+1}", refinement_start_time
             )
@@ -115,6 +116,7 @@ class SddipAlgorithm:
             ########################################
             lower_bound_start_time = time()
             v_lower = self.lower_bound(i + 1)
+            lower_bounds.append(v_lower)
             print("Lower bound: {} ".format(v_lower))
             self.runtime_logger.log_task_end(
                 f"lower_bound_i{i+1}", lower_bound_start_time
@@ -203,23 +205,21 @@ class SddipAlgorithm:
 
         return v_upper
 
-    def binary_approximation_refinement(self):
+    def binary_approximation_refinement(self, iteration: int, lower_bounds: list):
         # TODO refinement condition
         # Check if forward pass solution i equals that in i-1
-        refinement_condition = False
+        if iteration == 0:
+            return
 
-        new_multipliers = []
+        refinement_tolerance = 1
+
+        delta = abs((lower_bounds[-1] - lower_bounds[-2]))
+
+        refinement_condition = delta <= refinement_tolerance
+
         if refinement_condition:
+            print("Refinement performed.")
             self.n_binaries += 1
-            # for g in range(self.problem_params.n_gens):
-            #     n_binaries = len(self.y_bin_multipliers[g]) + 1
-            #     new_multipliers.append(
-            #         self.binarizer.calc_binary_multipliers_from_n_binaries(
-            #             self.problem_params.pg_max[g], n_binaries
-            #         )
-            #     )
-
-            # self.y_bin_multipliers = new_multipliers
 
     def backward_pass(self, iteration: int, samples: list):
         i = iteration

@@ -77,7 +77,7 @@ class ScenarioGenerator:
         n_buses: int,
         renewables_buses: list,
         base_generation: list,
-        max_relative_variation: float = 0.3,
+        max_relative_variation: float,
     ):
         if not len(renewables_buses) == len(base_generation):
             raise ValueError(

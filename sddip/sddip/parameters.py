@@ -15,7 +15,7 @@ class Parameters:
         branch_file="branch_data.txt",
         gen_file="gen_data.txt",
         gen_cost_file="gen_cost_data.txt",
-        gen_sup_file="gen_data_sup.txt",
+        gen_sup_file="gen_sup_data.txt",
         renewables_file="ren_data.txt",
         storage_file="storage_data.txt",
         scenario_file="scenario_data.txt",

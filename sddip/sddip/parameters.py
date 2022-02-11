@@ -138,9 +138,9 @@ class Parameters:
 
         self.gc = np.array(self.gen_cost_df.c1)
         self.suc = np.array(self.gen_cost_df.startup)
-        self.sdc = np.array(self.gen_cost_df.startup)
+        self.sdc = np.array(self.gen_cost_df.shutdown)
         # TODO Adjust penalty for slack variables
-        self.penalty = 1000
+        self.penalty = 5000
 
         self.cost_coeffs = (
             self.gc.tolist()

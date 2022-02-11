@@ -1,5 +1,6 @@
 class ResultKeys:
     # Result keys
+    v_key = "v"
     x_key = "x"
     y_key = "y"
     x_bs_key = "x_bs"

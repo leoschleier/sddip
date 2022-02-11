@@ -131,12 +131,12 @@ class SddipAlgorithm:
         n_samples = len(samples)
         v_opt_k = []
 
-        x_trial_point = self.problem_params.init_x_trial_point
-        y_trial_point = self.problem_params.init_y_trial_point
-        x_bs_trial_point = self.problem_params.init_x_bs_trial_point
-        soc_trial_point = self.problem_params.init_soc_trial_point
-
         for k in range(n_samples):
+            x_trial_point = self.problem_params.init_x_trial_point
+            y_trial_point = self.problem_params.init_y_trial_point
+            x_bs_trial_point = self.problem_params.init_x_bs_trial_point
+            soc_trial_point = self.problem_params.init_soc_trial_point
+
             v_opt_k.append(0)
             for t, n in zip(range(self.problem_params.n_stages), samples[k]):
 
@@ -172,8 +172,19 @@ class SddipAlgorithm:
                 x_bs_kt = [[x_bs.x for x_bs in x_bs_g] for x_bs_g in uc_fw.x_bs]
                 soc_kt = [soc_s.x for soc_s in uc_fw.soc]
 
+                # if t == 0:
+                #     yc = [c.x for c in uc_fw.ys_c]
+                #     ydc = [dc.x for dc in uc_fw.ys_dc]
+                #     print(f"soc-trial: {soc_trial_point}")
+                #     print(f"soc: {soc_kt}")
+                #     print(f"yc: {yc}")
+                #     print(f"ydc: {ydc}")
+                #     print(f"ysp: {uc_fw.ys_p.x}")
+                #     print(f"ysn:{uc_fw.ys_n.x}")
+
                 # Value of stage t objective function
-                v_opt_kt = uc_fw.model.getObjective().getValue() - uc_fw.theta.x
+                v_value_function = uc_fw.model.getObjective().getValue()
+                v_opt_kt = v_value_function - uc_fw.theta.x
                 v_opt_k[-1] += v_opt_kt
                 # print(f"Forward {t},{n}: {uc_fw.ys_p.x}")
                 # New trial point
@@ -191,6 +202,7 @@ class SddipAlgorithm:
                 ps_dict[ResultKeys.y_key] = y_kt
                 ps_dict[ResultKeys.x_bs_key] = x_bs_trial_point
                 ps_dict[ResultKeys.soc_key] = soc_kt
+                ps_dict[ResultKeys.v_key] = v_value_function
 
                 self.ps_storage.add_result(i, k, t, ps_dict)
 

@@ -2,7 +2,7 @@ import gurobipy as gp
 from time import time
 from sddip import parameters, tree, logger
 
-test_case_name = "WB2"
+test_case_name = "case6ww"
 
 log_manager = logger.LogManager()
 log_dir = log_manager.create_log_dir(f"{test_case_name}_ext")
@@ -116,7 +116,8 @@ model.addConstrs(
         - gp.quicksum(params.re[t][n.realization])
         for t in range(params.n_stages)
         for n in scenario_tree.get_stage_nodes(t)
-    )
+    ),
+    "balance",
 )
 
 

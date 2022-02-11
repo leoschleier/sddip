@@ -126,7 +126,7 @@ class SubgradientMethod:
             self.print_iteration_info(j, opt_value, gradient_magnitude, step_size)
 
         stop_reason = "Tolerance" if tolerance_reached else "Max iterations"
-        print(f"Subgradient Method finished ({stop_reason}, {lowest_gm})")
+        self.print_info(f"Subgradient Method finished ({stop_reason}, {lowest_gm})")
 
         self.runtime_logger.log_task_end(
             f"subgradient_method_{self.n_calls}", subgradient_start_time

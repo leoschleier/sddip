@@ -32,7 +32,7 @@ class SddipAlgorithm:
             self.problem_params.n_realizations_per_stage[1],
         )
         self.sg_method = dualsolver.SubgradientMethod(
-            max_iterations=1000, log_dir=log_dir
+            max_iterations=3000, log_dir=log_dir
         )
         self.sg_method.log_flag = False
 

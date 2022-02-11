@@ -34,6 +34,7 @@ class SubgradientMethod:
         self.const_step_length = 1
         self.step_size_parameter = 2
         self.no_improvement_limit = 10
+        self.smoothing_factor = 0.25
 
     def solve(
         self,
@@ -119,14 +120,17 @@ class SubgradientMethod:
                 no_improvement_counter = 0
 
             # Calculate new dual multipliers
-            step_size = self.get_step_size("csl", gradient_magnitude)
+            step_size = self.get_step_size("csl", subgradient)
             if not j == self.max_iterations - 1:
                 dual_multipliers = dual_multipliers + step_size * subgradient
 
-            self.print_iteration_info(j, opt_value, gradient_magnitude, step_size)
+            self.print_iteration_info(j, opt_value, subgradient, step_size)
 
         stop_reason = "Tolerance" if tolerance_reached else "Max iterations"
-        self.print_info(f"Subgradient Method finished ({stop_reason}, {lowest_gm})")
+        self.print_info(
+            f"Subgradient Method finished ({stop_reason}, i: {j+1}, g: {lowest_gm})"
+        )
+        print(f"Subgradient Method finished ({stop_reason}, i: {j+1}, g: {lowest_gm})")
 
         self.runtime_logger.log_task_end(
             f"subgradient_method_{self.n_calls}", subgradient_start_time
@@ -137,14 +141,16 @@ class SubgradientMethod:
 
     def get_step_size(
         self,
-        method="css",
-        gradient_magnitude=None,
-        step_size_parameter=None,
-        upper_bound=None,
-        opt_value=None,
+        method: str = "css",
+        gradient: list = [None],
+        step_size_parameter: float = None,
+        function_value: float = None,
+        opt_value_estimate: float = None,
+        smoothed_gradient: float = None,
     ):
 
         step_size = None
+        gradient_magnitude = np.linalg.norm(gradient, 2) if any(gradient) else None
 
         if method == "css":
             # Constant step size
@@ -156,13 +162,17 @@ class SubgradientMethod:
             method == "dss"
             and gradient_magnitude != None
             and step_size_parameter != None
-            and upper_bound != None
-            and opt_value != None
+            and function_value != None
+            and opt_value_estimate != None
         ):
             # Dependent step size
+            # smoothed_gradient = (
+            #     1 - self.smoothing_factor
+            # ) * gradient + self.smoothing_factor * smoothed_gradient
+
             step_size = (
                 step_size_parameter
-                * (upper_bound - opt_value)
+                * (function_value - opt_value_estimate)
                 / gradient_magnitude ** 2
             )
         else:

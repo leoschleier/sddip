@@ -34,13 +34,14 @@ class SubgradientMethod:
         self.const_step_length = 1
         self.step_size_parameter = 2
         self.no_improvement_limit = 10
+        self.smoothing_factor = 0.25
 
     def solve(
         self,
         model: gp.Model,
         objective_terms,
         relaxed_terms,
-        upper_bound: float = None,
+        optimal_value_estimate: float = None,
         log_id: str = None,
     ) -> gp.Model:
 
@@ -56,9 +57,11 @@ class SubgradientMethod:
 
         gradient_len = len(relaxed_terms)
         dual_multipliers = np.zeros(gradient_len)
+        # dual_multipliers = np.full(gradient_len, 10000)
 
         best_lower_bound = self.inital_lower_bound
         best_multipliers = dual_multipliers
+        lowest_gm = 100
 
         no_improvement_counter = 0
 
@@ -91,6 +94,12 @@ class SubgradientMethod:
 
             self.print_verbose(j, model, dual_multipliers, subgradient)
 
+            gradient_magnitude = np.linalg.norm(subgradient, 2)
+
+            lowest_gm = (
+                gradient_magnitude if gradient_magnitude < lowest_gm else lowest_gm
+            )
+
             # Update best lower bound and mutlipliers
             if best_lower_bound < opt_value:
                 best_lower_bound = opt_value
@@ -100,11 +109,14 @@ class SubgradientMethod:
                 no_improvement_counter = 0
 
             # Check Stopping criteria
-            gradient_magnitude = np.linalg.norm(subgradient, 2)
             if gradient_magnitude <= self.tolerance:
                 tolerance_reached = True
                 self.print_iteration_info(j, opt_value, gradient_magnitude)
                 break
+            if optimal_value_estimate:
+                if abs(optimal_value_estimate - opt_value) <= 10 ** (-8):
+                    tolerance_reached = True
+                    break
 
             # Reduce step size parameter if lower bound does not improve for 10 iterations
             if no_improvement_counter == self.no_improvement_limit:
@@ -112,14 +124,24 @@ class SubgradientMethod:
                 no_improvement_counter = 0
 
             # Calculate new dual multipliers
-            step_size = self.get_step_size("csl", gradient_magnitude)
+            method = "dss" if optimal_value_estimate else "csl"
+            #method = "csl"
+            step_size = self.get_step_size(
+                method, subgradient, opt_value, optimal_value_estimate
+            )
+
             if not j == self.max_iterations - 1:
                 dual_multipliers = dual_multipliers + step_size * subgradient
 
-            self.print_iteration_info(j, opt_value, gradient_magnitude, step_size)
+            self.print_iteration_info(j, opt_value, subgradient, step_size)
 
         stop_reason = "Tolerance" if tolerance_reached else "Max iterations"
-        self.print_info(f"Subgradient Method finished ({stop_reason})")
+        self.print_info(
+            f"Subgradient Method finished ({stop_reason}, i: {j+1}, g: {lowest_gm})"
+        )
+        print(
+            f"Subgradient Method finished ({stop_reason}, m: {method}, i: {j+1}, g: {lowest_gm}, lb: {best_lower_bound})"
+        )
 
         self.runtime_logger.log_task_end(
             f"subgradient_method_{self.n_calls}", subgradient_start_time
@@ -130,14 +152,14 @@ class SubgradientMethod:
 
     def get_step_size(
         self,
-        method="css",
-        gradient_magnitude=None,
-        step_size_parameter=None,
-        upper_bound=None,
-        opt_value=None,
+        method: str = "css",
+        gradient: list = [None],
+        function_value: float = None,
+        opt_value_estimate: float = None,
     ):
 
         step_size = None
+        gradient_magnitude = np.linalg.norm(gradient, 2) if any(gradient) else None
 
         if method == "css":
             # Constant step size
@@ -148,16 +170,16 @@ class SubgradientMethod:
         elif (
             method == "dss"
             and gradient_magnitude != None
-            and step_size_parameter != None
-            and upper_bound != None
-            and opt_value != None
+            and function_value != None
+            and opt_value_estimate != None
         ):
             # Dependent step size
-            step_size = (
-                step_size_parameter
-                * (upper_bound - opt_value)
-                / gradient_magnitude ** 2
-            )
+            # smoothed_gradient = (
+            #     1 - self.smoothing_factor
+            # ) * gradient + self.smoothing_factor * smoothed_gradient
+
+            step_size = (opt_value_estimate - function_value) / gradient_magnitude ** 2
+
         else:
             raise ValueError("Incompatible arguments")
 

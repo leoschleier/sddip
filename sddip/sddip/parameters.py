@@ -75,6 +75,7 @@ class Parameters:
         # Stochastic problem parameters
         self.n_stages = None
         self.n_realizations_per_stage = None
+        self.n_scenarios = None
 
         # Nodal probability
         self.prob = None
@@ -139,6 +140,23 @@ class Parameters:
         self.gc = np.array(self.gen_cost_df.c1)
         self.suc = np.array(self.gen_cost_df.startup)
         self.sdc = np.array(self.gen_cost_df.shutdown)
+
+        # Storages
+        storage_buses = self.storage_df.bus.values.tolist()
+        self.n_storages = len(storage_buses)
+        self.storages_at_bus = [[] for _ in range(self.n_buses)]
+        s = 0
+        for b in storage_buses:
+            self.storages_at_bus[b - 1].append(s)
+            s += 1
+
+        self.rc_max = self.storage_df["Rc"].values.tolist()
+        self.rdc_max = self.storage_df["Rdc"].values.tolist()
+        self.soc_max = self.storage_df["SOC"].values.tolist()
+
+        self.eff_c = self.storage_df["Effc"].values.tolist()
+        self.eff_dc = self.storage_df["Effdc"].values.tolist()
+
         # TODO Adjust penalty for slack variables
         self.penalty = 5000
 
@@ -149,9 +167,9 @@ class Parameters:
             + [self.penalty] * 2
         )
 
-        self.pg_min = np.array(self.gen_df.Pmin)
-        self.pg_max = np.array(self.gen_df.Pmax)
-        self.pl_max = np.array(self.branch_df.rateA)
+        self.pg_min = self.gen_df.Pmin.values.tolist()
+        self.pg_max = self.gen_df.Pmax.values.tolist()
+        self.pl_max = self.branch_df.rateA.values.tolist()
 
         self.n_gens = len(self.gc)
 
@@ -180,22 +198,6 @@ class Parameters:
             g += 1
         self.gens_at_bus = gens_at_bus
 
-        # Storages
-        storage_buses = self.storage_df.bus.values.tolist()
-        self.n_storages = len(storage_buses)
-        self.storages_at_bus = [[] for _ in range(self.n_buses)]
-        s = 0
-        for b in storage_buses:
-            self.storages_at_bus[b - 1].append(s)
-            s += 1
-
-        self.rc_max = self.storage_df["Rc"].values.tolist()
-        self.rdc_max = self.storage_df["Rdc"].values.tolist()
-        self.soc_max = self.storage_df["SOC"].values.tolist()
-
-        self.eff_c = self.storage_df["Effc"].values.tolist()
-        self.eff_dc = self.storage_df["Effdc"].values.tolist()
-
     def _init_stochastic_parameters(self):
         """Initializes all stochastic parameters
         """
@@ -203,6 +205,7 @@ class Parameters:
 
         self.n_realizations_per_stage = scenario_df.groupby("t")["n"].nunique().tolist()
         self.n_stages = len(self.n_realizations_per_stage)
+        self.n_scenarios = np.prod(self.n_realizations_per_stage)
 
         prob = []
         p_d = []

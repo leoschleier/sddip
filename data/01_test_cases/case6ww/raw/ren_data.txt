@@ -1,4 +1,4 @@
-bus base_frac
+bus max_frac
 1   0
 2   0.3
 3   0

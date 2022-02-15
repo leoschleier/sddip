@@ -73,12 +73,20 @@ class Binarizer:
     def calc_binary_multipliers_from_n_binaries(
         self, upper_bound: float, n_binaries: int
     ):
-        precision = upper_bound / (sum([2 ** (k) for k in range(n_binaries)]))
+        precision = self.calc_precision_from_n_binaries(upper_bound, n_binaries)
 
         return self.calc_binary_multipliers(precision, n_binaries)
 
     def calc_binary_multipliers(self, precision: float, n_binaries: int):
         return [precision * 2 ** i for i in range(n_binaries)]
+
+    def calc_precision_from_n_binaries(self, upper_bound: float, n_binaries: int):
+        return upper_bound / (sum([2 ** (k) for k in range(n_binaries)]))
+
+    def calc_max_abs_error(self, precision: int):
+        if 0 > precision > 1:
+            raise ValueError("Precision should be between 0 and 1.")
+        return precision / 2
 
     def calc_binary_lower_approximation(self, x: float, binary_multipliers: list):
         bin_vars = []

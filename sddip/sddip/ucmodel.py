@@ -39,7 +39,10 @@ class ModelBuilder(ABC):
         self.ys_dc = []
         # Switch variable
         self.u_c_dc = []
+        # SOC and slack
         self.soc = []
+        self.socs_p = []
+        self.socs_n = []
         # Copy variables
         self.z_x = []
         self.z_y = []
@@ -102,6 +105,12 @@ class ModelBuilder(ABC):
             self.soc.append(
                 self.model.addVar(vtype=gp.GRB.CONTINUOUS, lb=0, name=f"soc_{s+1}")
             )
+            self.socs_p.append(
+                self.model.addVar(vtype=gp.GRB.CONTINUOUS, lb=0, name="socs_p")
+            )
+            self.socs_n.append(
+                self.model.addVar(vtype=gp.GRB.CONTINUOUS, lb=0, name="socs_n")
+            )
         self.theta = self.model.addVar(
             vtype=gp.GRB.CONTINUOUS, lb=-gp.GRB.INFINITY, name="theta"
         )
@@ -145,10 +154,20 @@ class ModelBuilder(ABC):
             )
         self.model.update()
 
-    def add_objective(self, coefficients: list):
-        coefficients = coefficients + [1]
+    def add_objective(self, coefficients: list, include_soc_slack: bool = False):
+
+        penalty = coefficients[-1] if include_soc_slack else 0
+
+        coefficients = coefficients + [penalty] * 2 * self.n_storages + [1]
+
         variables = (
-            self.y + self.s_up + self.s_down + [self.ys_p, self.ys_n, self.theta]
+            self.y
+            + self.s_up
+            + self.s_down
+            + [self.ys_p, self.ys_n]
+            + self.socs_p
+            + self.socs_n
+            + [self.theta]
         )
         self.objective_terms = gp.LinExpr(coefficients, variables)
         self.model.setObjective(self.objective_terms)
@@ -221,6 +240,15 @@ class ModelBuilder(ABC):
                 for s in range(self.n_storages)
             ),
             "soc",
+        )
+
+    def add_final_soc_constraints(self, final_soc: list):
+        self.model.addConstrs(
+            (
+                self.soc[s] + self.socs_p[s] - self.socs_n[s] == final_soc[s]
+                for s in range(self.n_storages)
+            ),
+            "final soc",
         )
 
     def add_power_flow_constraints(
@@ -332,7 +360,7 @@ class ModelBuilder(ABC):
         cut_gradients: list,
         y_binary_multipliers: list,
         soc_binary_multipliers: list,
-        big_m: float = 10 ** 18,
+        big_m: float,
         sos: bool = False,
     ):
         r = 0
@@ -352,7 +380,7 @@ class ModelBuilder(ABC):
         y_binary_multipliers: np.array,
         soc_binary_multipliers: np.array,
         id: int,
-        big_m: float = 10 ** 18,
+        big_m: float,
         sos: bool = False,
     ):
 
@@ -605,7 +633,7 @@ class BackwardModelBuilder(ModelBuilder):
                 )
             )
 
-        j=0
+        j = 0
         for n_vars in self.n_x_bs_trial_binaries:
             self.x_bs_bin_copy_vars.append(
                 [
@@ -615,10 +643,10 @@ class BackwardModelBuilder(ModelBuilder):
                         ub=1,
                         name="x_bs_bin_copy_var_%i" % (k + 1),
                     )
-                    for k in range(j, j+n_vars)
+                    for k in range(j, j + n_vars)
                 ]
             )
-            j+=n_vars
+            j += n_vars
 
         for j in range(self.n_soc_trial_binaries):
             self.soc_bin_copy_vars.append(

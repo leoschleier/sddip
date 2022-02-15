@@ -16,3 +16,8 @@ class ResultKeys:
     y_bm_key = "y_multipliers"
     soc_bm_key = "soc_multipliers"
     cut_coefficient_keys = [ci_key, cg_key, y_bm_key, soc_bm_key]
+
+    lb_key = "lb"
+    ub_l_key = "ub_l"
+    ub_r_key = "ub_r"
+    bound_keys = [lb_key, ub_l_key, ub_r_key]

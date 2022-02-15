@@ -16,14 +16,18 @@ class SddipAlgorithm:
         # Logger
         self.runtime_logger = logger.RuntimeLogger(log_dir)
 
-        # Algorithm paramters
-        self.n_samples = 30
-        self.n_binaries = 15
-        self.big_m = 10 ** 18
-        self.sos = False
-
         # Problem specific parameters
         self.problem_params = parameters.Parameters(test_case)
+
+        # Algorithm paramters
+        self.max_n_samples = min(30, int(self.problem_params.n_scenarios / 2))
+        self.n_samples = self.max_n_samples
+        self.n_binaries = 15
+        self.error_threshold = 10 ** -1
+        self.max_n_binaries = 15
+        self.refinement_tolerance = 10 ** 1
+        self.big_m = 10 ** 6
+        self.sos = False
 
         # Helper objects
         self.binarizer = utils.Binarizer()
@@ -32,7 +36,7 @@ class SddipAlgorithm:
             self.problem_params.n_realizations_per_stage[1],
         )
         self.sg_method = dualsolver.SubgradientMethod(
-            max_iterations=3000, log_dir=log_dir
+            max_iterations=5000, log_dir=log_dir
         )
         self.sg_method.log_flag = False
 
@@ -46,6 +50,7 @@ class SddipAlgorithm:
         self.cc_storage = storage.ResultStorage(
             ResultKeys.cut_coefficient_keys, "cut_coefficients"
         )
+        self.bound_storage = storage.ResultStorage(ResultKeys.bound_keys, "bounds")
 
         # Initialization
         # self.init_binary_multipliers(self.init_n_binaries)
@@ -66,6 +71,8 @@ class SddipAlgorithm:
         self.sg_method.runtime_logger.start()
         lower_bounds = [0]
         for i in range(n_iterations):
+            print(f"Iteration {i+1}")
+
             ########################################
             # Sampling
             ########################################
@@ -87,8 +94,8 @@ class SddipAlgorithm:
             # Statistical upper bound
             ########################################
             upper_bound_start_time = time()
-            v_upper = self.statistical_upper_bound(v_opt_k, n_samples)
-            print("Statistical upper bound: {} ".format(v_upper))
+            v_upper_l, v_upper_r = self.statistical_upper_bound(v_opt_k, n_samples)
+            print("Statistical upper bound: {} ".format(v_upper_l))
             self.runtime_logger.log_task_end(
                 f"upper_bound_i{i+1}", upper_bound_start_time
             )
@@ -122,8 +129,32 @@ class SddipAlgorithm:
                 f"lower_bound_i{i+1}", lower_bound_start_time
             )
 
+            bound_dict = self.bound_storage.create_empty_result_dict()
+            bound_dict[ResultKeys.lb_key] = v_lower
+            bound_dict[ResultKeys.ub_l_key] = v_upper_l
+            bound_dict[ResultKeys.ub_r_key] = v_upper_r
+            self.bound_storage.add_result(i, 0, 0, bound_dict)
+
+            # Increase number of samples
+            if self.n_samples < self.max_n_samples:
+                self.n_samples += 1
+
         self.runtime_logger.log_experiment_end()
         self.sg_method.runtime_logger.log_experiment_end()
+
+        ########################################
+        # Final upper bound
+        ########################################
+        n_samples = max(30, self.problem_params.n_scenarios)
+        samples = self.sc_sampler.generate_samples(n_samples)
+        v_opt_k = self.forward_pass(n_iterations, samples)
+
+        bound_dict = self.bound_storage.create_empty_result_dict()
+        bound_dict[ResultKeys.lb_key] = 0
+        bound_dict[ResultKeys.ub_l_key] = v_upper_l
+        bound_dict[ResultKeys.ub_r_key] = v_upper_r
+        self.bound_storage.add_result(n_iterations, 0, 0, bound_dict)
+
         print("#### SDDiP-Algorithm finished ####")
 
     def forward_pass(self, iteration: int, samples: list) -> list:
@@ -166,7 +197,6 @@ class SddipAlgorithm:
                 uc_fw.disable_output()
                 uc_fw.model.optimize()
 
-                # Store xtik, ytik, ztik, vtik
                 x_kt = [x_g.x for x_g in uc_fw.x]
                 y_kt = [y_g.x for y_g in uc_fw.y]
                 x_bs_kt = [[x_bs.x for x_bs in x_bs_g] for x_bs_g in uc_fw.x_bs]
@@ -213,21 +243,40 @@ class SddipAlgorithm:
         v_std = np.std(v_opt_k)
         alpha = 0.05
 
-        v_upper = v_mean + stats.norm.ppf(alpha / 2) * v_std / np.sqrt(n_samples)
+        v_upper_l = v_mean + stats.norm.ppf(alpha / 2) * v_std / np.sqrt(n_samples)
+        v_uppper_r = v_mean - stats.norm.ppf(alpha / 2) * v_std / np.sqrt(n_samples)
 
-        return v_upper
+        return v_upper_l, v_uppper_r
 
     def binary_approximation_refinement(self, iteration: int, lower_bounds: list):
         # TODO refinement condition
         # Check if forward pass solution i equals that in i-1
-        if iteration == 0:
+        upper_bounds = self.problem_params.pg_max + self.problem_params.soc_max
+
+        continuous_variables_precision = [
+            self.binarizer.calc_precision_from_n_binaries(ub, self.n_binaries)
+            for ub in upper_bounds
+        ]
+
+        continuous_variables_approx_error = [
+            self.binarizer.calc_max_abs_error(prec)
+            for prec in continuous_variables_precision
+        ]
+
+        print(f"Approximation errors: {continuous_variables_approx_error}")
+
+        # errors_below_threshold = all(
+        #     v <= self.error_threshold for v in continuous_variables_approx_error
+        # )
+
+        # Check if refinement is usefull
+        if iteration == 0 or self.n_binaries >= self.max_n_binaries:
             return
 
-        refinement_tolerance = 1
-
+        # Check if refinment condition holds
         delta = abs((lower_bounds[-1] - lower_bounds[-2]))
 
-        refinement_condition = delta <= refinement_tolerance
+        refinement_condition = delta <= self.refinement_tolerance
 
         if refinement_condition:
             print("Refinement performed.")
@@ -331,10 +380,18 @@ class SddipAlgorithm:
 
                     uc_bw.disable_output()
 
+                    primal_optimal_value = None
+                    # if t == self.problem_params.n_stages - 1:
+                    #     if samples[k][t] == n:
+                    #         primal_optimal_value = self.ps_storage.get_result(
+                    #             i - 1, k, t
+                    #         )["v"]
+
                     model, sg_results = self.sg_method.solve(
                         uc_bw.model,
                         objective_terms,
                         relaxed_terms,
+                        primal_optimal_value,
                         log_id=f"{i}_{k}_{t}_{n}",
                     )
                     # print(f"Backward ys_p {t},{n}: {uc_bw.ys_p.x}")
@@ -432,7 +489,9 @@ class SddipAlgorithm:
         realization: int,
         iteration: int,
     ) -> ucmodel.ModelBuilder:
-        model_builder.add_objective(self.problem_params.cost_coeffs)
+
+        include_soc_slack = stage == self.problem_params.n_stages - 1
+        model_builder.add_objective(self.problem_params.cost_coeffs, include_soc_slack)
 
         model_builder.add_balance_constraints(
             sum(self.problem_params.p_d[stage][realization]),
@@ -455,6 +514,11 @@ class SddipAlgorithm:
         )
 
         model_builder.add_soc_transfer(self.problem_params.eff_c)
+
+        if stage == self.problem_params.n_stages - 1:
+            model_builder.add_final_soc_constraints(
+                self.problem_params.init_soc_trial_point
+            )
 
         model_builder.add_generator_constraints(
             self.problem_params.pg_min, self.problem_params.pg_max

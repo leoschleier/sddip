@@ -27,7 +27,7 @@ class ScenarioGenerator:
         n_buses: int,
         demand_buses: list,
         max_value_targets: list,
-        max_relative_variation: float = 0.1,
+        max_relative_variation: float,
     ) -> pd.DataFrame:
 
         if not len(demand_buses) == len(max_value_targets):
@@ -48,10 +48,11 @@ class ScenarioGenerator:
             n_buses, demand_buses, "Pd"
         )
 
-        # Set loads for the first (deterministic) stage
+        # Set loads for buses without demand
         for b in no_demand_bus_keys:
             scenario_data[b] = [0] * self.n_total_realizations
 
+        # Set loads for the first (deterministic) stage
         for b in range(len(demand_buses)):
             scenario_data[demand_bus_keys[b]] = [
                 self.get_rdm_variation(base_profiles[b][0], max_relative_variation)
@@ -76,12 +77,16 @@ class ScenarioGenerator:
         self,
         n_buses: int,
         renewables_buses: list,
-        base_generation: list,
+        start_values: list,
+        step_sizes: list,
+        min_values: list,
+        max_values: list,
+        threshold:float,
         max_relative_variation: float,
-    ):
-        if not len(renewables_buses) == len(base_generation):
+    ) -> pd.DataFrame:
+        if not len(renewables_buses) == len(start_values):
             raise ValueError(
-                "Number of base generation entries must equal the number of renewables buses."
+                "Number of list entries must equal the number of renewables buses."
             )
 
         scenario_data = {"t": [1], "n": [1], "p": [1]}
@@ -90,15 +95,28 @@ class ScenarioGenerator:
             n_buses, renewables_buses, "Re"
         )
 
-        # Set loads for the first (deterministic) stage
+        # Set geneartion for buses without renewables
         for b in no_renewables_bus_keys:
             scenario_data[b] = [0] * self.n_total_realizations
 
-        generation_prev = []
+        # Generate base profiles
+        base_profiles = []
         for b in range(len(renewables_buses)):
-            gen = self.get_rdm_variation(base_generation[b], max_relative_variation)
-            scenario_data[renewables_bus_keys[b]] = [gen]
-            generation_prev.append(gen)
+            profile = self.random_walk(
+                self.n_stages,
+                start_values[b],
+                step_sizes[b],
+                min_values[b],
+                max_values[b],
+                threshold,
+            )
+            base_profiles.append(profile)
+
+        # Set generation for the first (deterministic) stage
+        for b in range(len(renewables_buses)):
+            scenario_data[renewables_bus_keys[b]] = [
+                self.get_rdm_variation(base_profiles[b][0], max_relative_variation)
+            ]
 
         # Set loads for stages >1
         for t in range(1, self.n_stages):
@@ -107,13 +125,44 @@ class ScenarioGenerator:
                 scenario_data["n"].append(n)
                 scenario_data["p"].append(1 / self.n_realizations_per_stage)
                 for b in range(len(renewables_buses)):
-                    gen = self.get_rdm_variation(
-                        generation_prev[b], max_relative_variation
+                    scenario_data[renewables_bus_keys[b]].append(
+                        self.get_rdm_variation(
+                            base_profiles[b][t], max_relative_variation
+                        )
                     )
-                    scenario_data[renewables_bus_keys[b]].append(gen)
-                    generation_prev[b] = gen
 
         return pd.DataFrame(scenario_data)
+
+    def random_walk(
+        self,
+        n_steps: int,
+        start_value: float,
+        step_size: float,
+        min_value: float,
+        max_value: float,
+        threshold: float = 0.5,
+    ) -> list:
+        values = []
+        prev_value = start_value
+
+        for _ in range(n_steps):
+            new_value = 0
+            probability = rdm.random()
+
+            if probability >= threshold:
+                new_value = prev_value + step_size
+            else:
+                new_value = prev_value - step_size
+
+            if new_value > max_value:
+                new_value = max_value
+            elif new_value < min_value:
+                new_value = min_value
+
+            values.append(new_value)
+            prev_value = new_value
+
+        return values
 
     def create_bus_keys(self, n_buses: int, active_buses: list, label: str) -> Tuple:
         active_bus_keys = []

@@ -1,35 +1,77 @@
+from abc import ABC
 import gurobipy as gp
 import numpy as np
 from time import time
 import os
 from sddip import logger
+import copy
 
 
-class SubgradientMethod:
-    def __init__(
-        self,
-        max_iterations: int = 100,
-        tolerance: float = 10 ** (-3),
-        initial_lower_bound: float = 0,
-        log_dir: str = None,
-    ) -> None:
-        self.inital_lower_bound = initial_lower_bound
-        self.max_iterations = max_iterations
-        self.tolerance = tolerance
-        self.results = SolverResults()
+class DualSolver(ABC):
+    def __init__(self, max_iterations: int, tolerance: float, log_dir: str, tag: str):
+        self.TAG = tag
+
+        log_manager = logger.LogManager()
+        runtime_log_dir = log_manager.create_log_dir(f"{self.TAG}_log")
+        self.runtime_logger = logger.RuntimeLogger(runtime_log_dir)
 
         self.output_flag = False
         self.output_verbose = False
-        self.log_flag = False
 
-        log_manager = logger.LogManager()
-        runtime_log_dir = log_manager.create_log_dir("sg_log")
-        self.runtime_logger = logger.RuntimeLogger(runtime_log_dir)
-        self.n_calls = 0
+        self.max_iterations = max_iterations
+        self.tolerance = tolerance
 
         self.log_dir = log_dir
+        self.n_calls = 0
+        self.solver_time = 0
+
+        self.results = SolverResults()
+
+    def get_subgradient_and_value(
+        self, model, objective_terms, relaxed_terms, dual_multipliers
+    ):
+        solver_start_time = time()
+        gradient_len = len(relaxed_terms)
+
+        total_objective = objective_terms + gp.quicksum(
+            relaxed_terms[i] * dual_multipliers[i] for i in range(gradient_len)
+        )
+
+        model.setObjective(total_objective)
+        model.update()
+        model.optimize()
+
+        subgradient = np.array([t.getValue() for t in relaxed_terms])
+        opt_value = model.getObjective().getValue()
+
+        self.solver_time += time() - solver_start_time
+
+        return (subgradient, opt_value)
+
+    def print_method_finished(
+        self,
+        stop_reason: str,
+        iteration: int,
+        lowest_gradient_magnitude: float,
+        best_lower_bound: float,
+        method: str = "",
+    ):
+        print(
+            f"Dual solver finished ({stop_reason}, m: {self.TAG}{method}, i: {iteration}, st: {self.solver_time}, g: {lowest_gradient_magnitude}, lb: {best_lower_bound})"
+        )
+
+
+class SubgradientMethod(DualSolver):
+
+    TAG = "SG"
+
+    def __init__(
+        self, max_iterations: int, tolerance: float, log_dir: str = None,
+    ) -> None:
+        super().__init__(max_iterations, tolerance, log_dir, self.TAG)
 
         # Step size parameters
+        self.initial_lower_bound = 0
         self.const_step_size = 1
         self.const_step_length = 1
         self.step_size_parameter = 2
@@ -46,6 +88,7 @@ class SubgradientMethod:
     ) -> gp.Model:
 
         self.n_calls += 1
+        self.solver_time = 0
         subgradient_start_time = time()
 
         model.setParam("OutputFlag", 0)
@@ -59,7 +102,7 @@ class SubgradientMethod:
         dual_multipliers = np.zeros(gradient_len)
         # dual_multipliers = np.full(gradient_len, 10000)
 
-        best_lower_bound = self.inital_lower_bound
+        best_lower_bound = self.initial_lower_bound
         best_multipliers = dual_multipliers
         lowest_gm = 100
 
@@ -73,24 +116,16 @@ class SubgradientMethod:
         self.print_info("Subgradient Method started")
 
         for j in range(self.max_iterations):
-            # Update model
-            total_objective = objective_terms + gp.quicksum(
-                relaxed_terms[i] * dual_multipliers[i] for i in range(gradient_len)
-            )
-            model.setObjective(total_objective)
-            model.update()
 
-            # Optimization
-            model.optimize()
+            # Optimize
+            subgradient, opt_value = self.get_subgradient_and_value(
+                model, objective_terms, relaxed_terms, dual_multipliers
+            )
 
             if self.log_flag:
                 gurobi_logger.log_model(
                     model, str(j).zfill(len(str(self.max_iterations)))
                 )
-
-            # Optimal value
-            opt_value = model.getObjective().getValue()
-            subgradient = np.array([t.getValue() for t in relaxed_terms])
 
             self.print_verbose(j, model, dual_multipliers, subgradient)
 
@@ -125,7 +160,7 @@ class SubgradientMethod:
 
             # Calculate new dual multipliers
             method = "dss" if optimal_value_estimate else "csl"
-            #method = "csl"
+            # method = "csl"
             step_size = self.get_step_size(
                 method, subgradient, opt_value, optimal_value_estimate
             )
@@ -136,11 +171,9 @@ class SubgradientMethod:
             self.print_iteration_info(j, opt_value, subgradient, step_size)
 
         stop_reason = "Tolerance" if tolerance_reached else "Max iterations"
-        self.print_info(
-            f"Subgradient Method finished ({stop_reason}, i: {j+1}, g: {lowest_gm})"
-        )
-        print(
-            f"Subgradient Method finished ({stop_reason}, m: {method}, i: {j+1}, g: {lowest_gm}, lb: {best_lower_bound})"
+
+        self.print_method_finished(
+            stop_reason, j + 1, lowest_gm, best_lower_bound, method
         )
 
         self.runtime_logger.log_task_end(
@@ -232,6 +265,101 @@ class SubgradientMethod:
         dir = os.path.join(self.log_dir, f"{id}_subgradient")
         os.mkdir(dir)
         return dir
+
+
+class BundleMethod(DualSolver):
+
+    TAG = "BM"
+
+    def __init__(self, max_iterations: int, tolerance: float, log_dir: str):
+        super().__init__(max_iterations, tolerance, log_dir, self.TAG)
+
+        self.penalty_factor = 1
+        self.alpha = 0.5
+
+    def solve(self, model: gp.Model, objective_terms, relaxed_terms):
+        model.setParam("OutputFlag", 0)
+        self.solver_time = 0
+        tolerance_reached = False
+        gradient_len = len(relaxed_terms)
+        dual_multipliers = np.zeros(gradient_len)
+        dual_multipliers_best = np.zeros(gradient_len)
+
+        # Initial subgradient and best lower bound
+        subgradient, opt_value_best = self.get_subgradient_and_value(
+            model, objective_terms, relaxed_terms, dual_multipliers_best
+        )
+
+        opt_value = opt_value_best
+
+        # Lowest known gradient magnitude
+        lowest_gm = np.linalg.norm(np.array(subgradient))
+
+        # Subproblem with cutting planes
+        subproblem, epi, dm = self.create_subproblem(gradient_len)
+
+        for i in range(self.max_iterations):
+
+            # Add new plane to subproblem
+            new_plane = opt_value + gp.quicksum(
+                subgradient[j] * (dm[j] - dual_multipliers[j])
+                for j in range(gradient_len)
+            )
+
+            obj = epi - self.penalty_factor / 2 * gp.quicksum(
+                (dm[j] - dual_multipliers_best[j]) ** 2 for j in range(gradient_len)
+            )
+            subproblem.setObjective(obj, gp.GRB.MAXIMIZE)
+
+            subproblem.addConstr(epi <= new_plane, name=f"{i+1}")
+            subproblem.update()
+
+            # Solve subproblem
+            subproblem.optimize()
+
+            # Candidate dual multipliers
+            dual_multipliers = [dm[j].x for j in range(gradient_len)]
+
+            # Calculate error
+            delta = max(0, subproblem.getObjective().getValue() - opt_value_best)
+
+            # Check stopping criterion
+            if delta < self.tolerance:
+                tolerance_reached = True
+                break
+
+            # Candidate optimal value
+            subgradient, opt_value = self.get_subgradient_and_value(
+                model, objective_terms, relaxed_terms, dual_multipliers
+            )
+
+            # Update lowest known gradient magnitude
+            lowest_gm = min(lowest_gm, np.linalg.norm(np.array(subgradient)))
+            # print(opt_value)
+            # print(opt_value_best)
+            # Serious step
+            if opt_value - opt_value_best >= self.alpha * delta:
+                dual_multipliers_best = copy.copy(dual_multipliers)
+                opt_value_best = copy.copy(opt_value)
+
+        stop_reason = "Tolerance" if tolerance_reached else "Max iterations"
+
+        self.print_method_finished(stop_reason, i + 1, lowest_gm, opt_value_best)
+
+        self.results.set_values(opt_value_best, np.array(dual_multipliers_best))
+
+        return (model, self.results)
+
+    def create_subproblem(self, n_dual_multipliers: int):
+        subproblem = gp.Model("Subproblem")
+        subproblem.setParam("OutputFlag", 0)
+        epi = subproblem.addVar(
+            vtype=gp.GRB.CONTINUOUS, lb=-gp.GRB.INFINITY, name="epi"
+        )
+        dm = subproblem.addVars(
+            n_dual_multipliers, vtype=gp.GRB.CONTINUOUS, lb=-gp.GRB.INFINITY, name="dm"
+        )
+        return subproblem, epi, dm
 
 
 class SolverResults:

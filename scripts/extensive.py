@@ -407,6 +407,8 @@ total_slack = 0
 for variable in slack_variables:
     total_slack += sum([slack.x for _, slack in variable.items()])
 
+# model.setParam("OutputFlag", 1)
+# model.display()
 
 print("Solving finished.")
 print(f"Optimal value: {obj.getValue()}")

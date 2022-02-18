@@ -12,7 +12,7 @@ from sddip.constants import ResultKeys
 
 
 class SddipAlgorithm:
-    def __init__(self, test_case: str, log_dir: str):
+    def __init__(self, test_case: str, log_dir: str, method: str = "bm"):
         # Logger
         self.runtime_logger = logger.RuntimeLogger(log_dir)
 
@@ -35,10 +35,21 @@ class SddipAlgorithm:
             self.problem_params.n_stages,
             self.problem_params.n_realizations_per_stage[1],
         )
-        self.sg_method = dualsolver.SubgradientMethod(
-            max_iterations=5000, log_dir=log_dir
-        )
-        self.sg_method.log_flag = False
+
+        ds_max_iterations = 200
+
+        if method == "sg":
+            self.dual_solver = dualsolver.SubgradientMethod(
+                ds_max_iterations, 10 ** -3, log_dir
+            )
+        elif method == "bm":
+            self.dual_solver = dualsolver.BundleMethod(
+                ds_max_iterations, 10 ** -1, log_dir
+            )
+        else:
+            raise ValueError(f"Method '{method}' does not exist.")
+
+        self.dual_solver.log_flag = False
 
         # Result storage
         self.ps_storage = storage.ResultStorage(
@@ -68,7 +79,7 @@ class SddipAlgorithm:
     def run(self, n_iterations: int):
         print("#### SDDiP-Algorithm started ####")
         self.runtime_logger.start()
-        self.sg_method.runtime_logger.start()
+        # self.sg_method.runtime_logger.start()
         lower_bounds = [0]
         for i in range(n_iterations):
             print(f"Iteration {i+1}")
@@ -140,7 +151,7 @@ class SddipAlgorithm:
                 self.n_samples += 1
 
         self.runtime_logger.log_experiment_end()
-        self.sg_method.runtime_logger.log_experiment_end()
+        # self.sg_method.runtime_logger.log_experiment_end()
 
         ########################################
         # Final upper bound
@@ -373,27 +384,12 @@ class SddipAlgorithm:
                     objective_terms = uc_bw.objective_terms
                     relaxed_terms = uc_bw.relaxed_terms
 
-                    # Solve problem with subgradient method
-                    # if i == 2 and t == 1:
-                    #     uc_bw.enable_output()
-                    #     uc_bw.model.display()
-
                     uc_bw.disable_output()
 
-                    primal_optimal_value = None
-                    # if t == self.problem_params.n_stages - 1:
-                    #     if samples[k][t] == n:
-                    #         primal_optimal_value = self.ps_storage.get_result(
-                    #             i - 1, k, t
-                    #         )["v"]
-
-                    model, sg_results = self.sg_method.solve(
-                        uc_bw.model,
-                        objective_terms,
-                        relaxed_terms,
-                        primal_optimal_value,
-                        log_id=f"{i}_{k}_{t}_{n}",
+                    model, sg_results = self.dual_solver.solve(
+                        uc_bw.model, objective_terms, relaxed_terms,
                     )
+
                     # print(f"Backward ys_p {t},{n}: {uc_bw.ys_p.x}")
                     # print(f"Backward soc {t},{n}: {[s.x for s in uc_bw.soc]}")
 

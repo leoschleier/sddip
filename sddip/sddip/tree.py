@@ -45,9 +45,7 @@ class ScenarioTree:
         self.n_nodes_per_stage = [len(s) for s in self.nodes]
 
     def __str__(self):
-        total_number_of_nodes = 0
-        for n in self.nodes:
-            total_number_of_nodes += len(n)
+        total_number_of_nodes = sum(self.n_nodes_per_stage)
         return (
             f"ScenarioTree: Stages = {self.n_stages}, Nodes = {total_number_of_nodes}"
         )

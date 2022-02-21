@@ -14,6 +14,7 @@ class ModelBuilder(ABC):
         generators_at_bus: list,
         storages_at_bus: list,
         backsight_periods: list,
+        lp_relax: bool = False,
     ) -> None:
         self.n_buses = n_buses
         self.n_lines = n_lines
@@ -71,28 +72,33 @@ class ModelBuilder(ABC):
         # Cut lower bound
         self.cut_lower_bound = None
 
-        self.initialize_variables()
+        self.initialize_variables(lp_relax)
         self.initialize_copy_variables()
 
-    def initialize_variables(self):
+    def initialize_variables(self, lp_relax: bool):
+
+        bin_type = gp.GRB.CONTINUOUS if lp_relax else gp.GRB.BINARY
+
         for g in range(self.n_generators):
-            self.x.append(self.model.addVar(vtype=gp.GRB.BINARY, name="x_%i" % (g + 1)))
+            self.x.append(
+                self.model.addVar(vtype=bin_type, ub=1, name="x_%i" % (g + 1))
+            )
             self.y.append(
                 self.model.addVar(vtype=gp.GRB.CONTINUOUS, lb=0, name="y_%i" % (g + 1))
             )
             self.x_bs.append(
                 [
                     self.model.addVar(
-                        vtype=gp.GRB.BINARY, name="x_bs_%i_%i" % (g + 1, k + 1),
+                        vtype=bin_type, ub=1, name="x_bs_%i_%i" % (g + 1, k + 1),
                     )
                     for k in range(self.backsight_periods[g])
                 ]
             )
             self.s_up.append(
-                self.model.addVar(vtype=gp.GRB.BINARY, name="s_up_%i" % (g + 1))
+                self.model.addVar(vtype=bin_type, ub=1, name="s_up_%i" % (g + 1))
             )
             self.s_down.append(
-                self.model.addVar(vtype=gp.GRB.BINARY, name="s_down_%i" % (g + 1))
+                self.model.addVar(vtype=bin_type, ub=1, name="s_down_%i" % (g + 1))
             )
         for s in range(self.n_storages):
             self.ys_c.append(
@@ -101,7 +107,7 @@ class ModelBuilder(ABC):
             self.ys_dc.append(
                 self.model.addVar(vtype=gp.GRB.CONTINUOUS, lb=0, name=f"y_dc_{s+1}")
             )
-            self.u_c_dc.append(self.model.addVar(vtype=gp.GRB.BINARY, name=f"u_{s+1}"))
+            self.u_c_dc.append(self.model.addVar(vtype=bin_type, ub=1, name=f"u_{s+1}"))
             self.soc.append(
                 self.model.addVar(vtype=gp.GRB.CONTINUOUS, lb=0, name=f"soc_{s+1}")
             )
@@ -288,28 +294,36 @@ class ModelBuilder(ABC):
     def add_startup_shutdown_constraints(self):
         self.model.addConstrs(
             (self.x[g] - self.z_x[g] <= self.s_up[g] for g in range(self.n_generators)),
-            "up-down(1)",
+            "start-up",
         )
         self.model.addConstrs(
             (
-                self.x[g] - self.z_x[g] == self.s_up[g] - self.s_down[g]
+                self.z_x[g] - self.x[g] <= self.s_down[g]
                 for g in range(self.n_generators)
             ),
-            "up-down(2)",
+            "shut-down",
         )
         self.update_model()
 
-    def add_ramp_rate_constraints(self, max_rate_up: list, max_rate_down: list):
+    def add_ramp_rate_constraints(
+        self,
+        max_rate_up: list,
+        max_rate_down: list,
+        startup_rate: list,
+        shutdown_rate: list,
+    ):
         self.model.addConstrs(
             (
-                self.y[g] - self.z_y[g] <= max_rate_up[g]
+                self.y[g] - self.z_y[g]
+                <= max_rate_up[g] * self.z_x[g] + startup_rate[g] * self.s_up[g]
                 for g in range(self.n_generators)
             ),
             "rate-up",
         )
         self.model.addConstrs(
             (
-                self.z_y[g] - self.y[g] <= max_rate_down[g]
+                self.z_y[g] - self.y[g]
+                <= max_rate_down[g] * self.x[g] + shutdown_rate[g] * self.s_down[g]
                 for g in range(self.n_generators)
             ),
             "rate-down",
@@ -352,6 +366,34 @@ class ModelBuilder(ABC):
     def add_cut_lower_bound(self, lower_bound: float):
         self.cut_lower_bound = self.model.addConstr(
             (self.theta >= lower_bound), "cut-lb"
+        )
+
+    def add_benders_cuts(
+        self, cut_intercepts: list, cut_gradients: list, trial_points: list,
+    ):
+        for intercept, gradient, trial_point in zip(
+            cut_intercepts, cut_gradients, trial_points
+        ):
+            self.add_benders_cut(intercept, gradient, trial_point)
+
+    def add_benders_cut(
+        self, cut_intercept: float, cut_gradient: list, trial_point: list
+    ):
+        state_variables = (
+            self.x + self.y + [var for gen_bs in self.x_bs for var in gen_bs] + self.soc
+        )
+        n_state_variables = len(state_variables)
+
+        self.model.addConstr(
+            (
+                self.theta
+                >= cut_intercept
+                + gp.quicksum(
+                    cut_gradient[i] * (state_variables[i] - trial_point[i])
+                    for i in range(n_state_variables)
+                )
+            ),
+            f"benders_cut",
         )
 
     def add_cut_constraints(
@@ -517,6 +559,7 @@ class ForwardModelBuilder(ModelBuilder):
         generators_at_bus: list,
         storages_at_bus: list,
         backsight_periods: list,
+        lp_relax: bool = False,
     ) -> None:
         super().__init__(
             n_buses,
@@ -526,6 +569,7 @@ class ForwardModelBuilder(ModelBuilder):
             generators_at_bus,
             storages_at_bus,
             backsight_periods,
+            lp_relax,
         )
 
     def add_copy_constraints(
@@ -749,9 +793,6 @@ class BackwardModelBuilder(ModelBuilder):
 
     def check_bin_copy_vars_not_empty(self):
         if not (
-            self.x_bin_copy_vars
-            and self.y_bin_copy_vars
-            and self.x_bs_bin_copy_vars
-            and self.soc_bin_copy_vars
+            self.x_bin_copy_vars and self.y_bin_copy_vars and self.x_bs_bin_copy_vars
         ):
             raise ValueError("Copy variable does not exist. Call add_relaxation first.")

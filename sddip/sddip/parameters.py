@@ -37,6 +37,7 @@ class Parameters:
 
         # Structural data
         self.ptdf = None
+        self.incidence_matrix = None
         self.n_lines = None
         self.n_buses = None
         self.n_gens = None
@@ -56,6 +57,8 @@ class Parameters:
         # Generator ramp rates
         self.r_up = None
         self.r_down = None
+        self.r_su = None
+        self.r_sd = None
         # Min up- and down-times
         self.min_up_time = None
         self.min_down_time = None
@@ -111,14 +114,14 @@ class Parameters:
 
         ref_bus = self.bus_df.loc[self.bus_df.type == 3].bus_i.values[0]
 
-        a_inc = graph.incidence_matrix()
+        self.incidence_matrix = graph.incidence_matrix()
         b_l = (
             -self.branch_df.x / (self.branch_df.r ** 2 + self.branch_df.x ** 2)
         ).tolist()
         b_diag = np.diag(b_l)
 
-        m1 = b_diag.dot(a_inc)
-        m2 = a_inc.T.dot(b_diag).dot(a_inc)
+        m1 = b_diag.dot(self.incidence_matrix)
+        m2 = self.incidence_matrix.T.dot(b_diag).dot(self.incidence_matrix)
 
         m1 = np.delete(m1, ref_bus - 1, 1)
         m2 = np.delete(m2, ref_bus - 1, 0)
@@ -158,7 +161,7 @@ class Parameters:
         self.eff_dc = self.storage_df["Effdc"].values.tolist()
 
         # TODO Adjust penalty for slack variables
-        self.penalty = 5000
+        self.penalty = 10000
 
         self.cost_coeffs = (
             self.gc.tolist()
@@ -176,6 +179,8 @@ class Parameters:
         # TODO Add ramp rate limits
         self.r_up = self.gen_sup_df["R_up"].values.tolist()
         self.r_down = self.gen_sup_df["R_down"].values.tolist()
+        self.r_su = [max(r, p) for r, p in zip(self.r_up, self.pg_min)]
+        self.r_sd = [max(r, p) for r, p in zip(self.r_down, self.pg_min)]
 
         # TODO add min up and down times to probelm data
         self.min_up_time = self.gen_sup_df["UT"].values.tolist()

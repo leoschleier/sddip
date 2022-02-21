@@ -21,3 +21,8 @@ class ResultKeys:
     ub_l_key = "ub_l"
     ub_r_key = "ub_r"
     bound_keys = [lb_key, ub_l_key, ub_r_key]
+
+    bc_intercept_key = "intercept"
+    bc_gradient_key = "gradient"
+    bc_trial_point_key = "trial_point"
+    benders_cut_keys = [bc_intercept_key, bc_gradient_key, bc_trial_point_key]

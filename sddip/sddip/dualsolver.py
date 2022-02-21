@@ -24,6 +24,7 @@ class DualSolver(ABC):
         self.log_dir = log_dir
         self.n_calls = 0
         self.solver_time = 0
+        self.start_time = None
 
         self.results = SolverResults()
 
@@ -60,6 +61,12 @@ class DualSolver(ABC):
             f"Dual solver finished ({stop_reason}, m: {self.TAG}{method}, i: {iteration}, st: {self.solver_time}, g: {lowest_gradient_magnitude}, lb: {best_lower_bound})"
         )
 
+    def log_task_start(self):
+        self.start_time = time()
+
+    def log_task_end(self):
+        self.runtime_logger.log_task_end(f"{self.TAG}_{self.n_calls}", self.start_time)
+
 
 class SubgradientMethod(DualSolver):
 
@@ -89,7 +96,8 @@ class SubgradientMethod(DualSolver):
 
         self.n_calls += 1
         self.solver_time = 0
-        subgradient_start_time = time()
+
+        self.log_task_start()
 
         model.setParam("OutputFlag", 0)
         if self.log_flag:
@@ -176,9 +184,7 @@ class SubgradientMethod(DualSolver):
             stop_reason, j + 1, lowest_gm, best_lower_bound, method
         )
 
-        self.runtime_logger.log_task_end(
-            f"subgradient_method_{self.n_calls}", subgradient_start_time
-        )
+        self.log_task_end()
 
         self.results.set_values(best_lower_bound, best_multipliers)
         return (model, self.results)
@@ -279,7 +285,11 @@ class BundleMethod(DualSolver):
 
     def solve(self, model: gp.Model, objective_terms, relaxed_terms):
         model.setParam("OutputFlag", 0)
+        self.n_calls += 1
         self.solver_time = 0
+
+        self.log_task_start()
+
         tolerance_reached = False
         gradient_len = len(relaxed_terms)
         dual_multipliers = np.zeros(gradient_len)
@@ -343,6 +353,8 @@ class BundleMethod(DualSolver):
                 opt_value_best = copy.copy(opt_value)
 
         stop_reason = "Tolerance" if tolerance_reached else "Max iterations"
+
+        self.log_task_end()
 
         self.print_method_finished(stop_reason, i + 1, lowest_gm, opt_value_best)
 

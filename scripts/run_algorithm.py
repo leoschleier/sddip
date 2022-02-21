@@ -3,8 +3,8 @@ from sddip import algorithm, logger, storage
 
 # Parameters
 test_case = "case6ww"
-n_iterations = 1
-init_n_binaries = 5
+n_iterations = 20
+init_n_binaries = 10
 init_n_samples = 1
 big_m = 10 ** 3
 sos = False

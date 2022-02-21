@@ -4,7 +4,7 @@ import pandas as pd
 from sddip import config
 
 # TODO Select parameters for data generation
-test_case_raw_dir = "case6ww/raw"
+test_case_raw_dir = "WB3/raw"
 
 # Ramp rate
 # (%/100 of rated capacity per unit time)
@@ -23,6 +23,7 @@ gen_df = pd.read_csv(gen_file, delimiter="\s+")
 scenario_df = pd.read_csv(scenario_file, delimiter="\s+")
 
 rated_capacities = gen_df["Pmax"].values.tolist()
+buses = gen_df["bus"].values.tolist()
 
 
 # Generate ramp rate limits
@@ -40,7 +41,7 @@ min_down_time = min_up_time
 
 # Export results
 supplementary_dict = {
-    "bus": [b for b in range(1, n_gens + 1)],
+    "bus": buses,
     "R_up": r_up,
     "R_down": r_down,
     "UT": min_up_time,

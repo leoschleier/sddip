@@ -1,0 +1,2 @@
+bus	R_up	R_down	UT	DT
+1	2500.0	2500.0	1	1

@@ -33,14 +33,17 @@ x = {}
 y = {}
 s_up = {}
 s_down = {}
-ys_p = {}
-ys_n = {}
 ys_charge = {}
 ys_discharge = {}
 u = {}
 soc = {}
 socs_p = {}
 socs_n = {}
+ys_p = {}
+ys_n = {}
+socs_fin_p = {}
+socs_fin_n = {}
+delta = {}
 
 for t in range(params.n_stages):
     for node in scenario_tree.get_stage_nodes(t):
@@ -67,21 +70,30 @@ for t in range(params.n_stages):
             soc[t, n, s] = model.addVar(
                 vtype=gp.GRB.CONTINUOUS, lb=0, name=f"soc_{t+1}_{n+1}_{s+1}"
             )
+            socs_p[t, n, s] = model.addVar(
+                vtype=gp.GRB.CONTINUOUS, lb=0, name=f"socs_p_{n+1}_{s+1}"
+            )
+            socs_n[t, n, s] = model.addVar(
+                vtype=gp.GRB.CONTINUOUS, lb=0, name=f"socs_n_{n+1}_{s+1}"
+            )
         ys_p[t, n] = model.addVar(
             vtype=gp.GRB.CONTINUOUS, lb=0, name=f"ys_p_{t+1}_{n+1}"
         )
         ys_n[t, n] = model.addVar(
             vtype=gp.GRB.CONTINUOUS, lb=0, name=f"ys_n_{t+1}_{n+1}"
         )
+        delta[t, n] = model.addVar(
+            vtype=gp.GRB.CONTINUOUS, lb=0, name=f"d_g_p_{t+1}_{n+1}"
+        )
 
 for node in scenario_tree.get_stage_nodes(params.n_stages - 1):
     n = node.index
     for s in range(params.n_storages):
-        socs_p[n, s] = model.addVar(
-            vtype=gp.GRB.CONTINUOUS, lb=0, name=f"socs_p_{n+1}_{s+1}"
+        socs_fin_p[n, s] = model.addVar(
+            vtype=gp.GRB.CONTINUOUS, lb=0, name=f"socs_fin_p_{n+1}_{s+1}"
         )
-        socs_n[n, s] = model.addVar(
-            vtype=gp.GRB.CONTINUOUS, lb=0, name=f"socs_n_{n+1}_{s+1}"
+        socs_fin_n[n, s] = model.addVar(
+            vtype=gp.GRB.CONTINUOUS, lb=0, name=f"socs_fin_n_{n+1}_{s+1}"
         )
 
 
@@ -101,22 +113,36 @@ for n in range(scenario_tree.n_stages):
     p = p * 1 / params.n_realizations_per_stage[n]
     conditional_probabilities.append(p)
 
-obj = gp.quicksum(
+obj_gen = gp.quicksum(
     conditional_probabilities[t]
     * (
         params.gc[g] * y[t, n, g]
         + params.suc[g] * s_up[t, n, g]
         + params.sdc[g] * s_down[t, n, g]
-        + params.penalty * (ys_p[t, n] + ys_n[t, n])
+        + params.penalty * (ys_p[t, n] + ys_n[t, n] + delta[t, n])
     )
     for t in range(params.n_stages)
     for n in range(scenario_tree.n_nodes_per_stage[t])
     for g in range(params.n_gens)
-) + params.penalty * gp.quicksum(
-    socs_n[n, s] + socs_p[n, s]
-    for n in range(scenario_tree.n_nodes_per_stage[params.n_stages - 1])
-    for s in range(params.n_storages)
 )
+
+obj_stge = gp.quicksum(
+    conditional_probabilities[t] * params.penalty * (socs_n[t, n, s] + socs_p[t, n, s])
+    for t in range(params.n_stages)
+    for n in range(scenario_tree.n_nodes_per_stage[t])
+    for s in range(params.n_storages)
+) + conditional_probabilities[params.n_stages - 1] * (
+    params.penalty
+    * gp.quicksum(
+        socs_fin_n[n, s] + socs_fin_p[n, s]
+        for n in range(scenario_tree.n_nodes_per_stage[params.n_stages - 1])
+        for s in range(params.n_storages)
+    )
+)
+
+obj = obj_gen + obj_stge
+
+print(obj_stge)
 
 model.setObjective(obj)
 
@@ -146,7 +172,7 @@ print("Adding generation constraints...")
 
 model.addConstrs(
     (
-        y[t, n, g] >= params.pg_min[g] * x[t, n, g]
+        y[t, n, g] >= params.pg_min[g] * x[t, n, g] - delta[t, n]
         for g in range(params.n_gens)
         for t in range(params.n_stages)
         for n in range(scenario_tree.n_nodes_per_stage[t])
@@ -156,7 +182,7 @@ model.addConstrs(
 
 model.addConstrs(
     (
-        y[t, n, g] <= params.pg_max[g] * x[t, n, g]
+        y[t, n, g] <= params.pg_max[g] * x[t, n, g] + delta[t, n]
         for g in range(params.n_gens)
         for t in range(params.n_stages)
         for n in range(scenario_tree.n_nodes_per_stage[t])
@@ -190,7 +216,7 @@ model.addConstrs(
 
 model.addConstrs(
     (
-        soc[t, n, s] <= params.soc_max[s]
+        soc[t, n, s] <= params.soc_max[s] + delta[t, n]
         for s in range(params.n_storages)
         for t in range(params.n_stages)
         for n in range(scenario_tree.n_nodes_per_stage[t])
@@ -206,7 +232,11 @@ soc_init = params.init_soc_trial_point
 model.addConstrs(
     (
         soc[0, 0, s]
-        == soc_init[s] + params.eff_c[s] * ys_charge[0, 0, s] - ys_discharge[0, 0, s]
+        == soc_init[s]
+        + params.eff_c[s] * ys_charge[0, 0, s]
+        - ys_discharge[0, 0, s]
+        + socs_p[0, 0, s]
+        - socs_n[0, 0, s]
         for s in range(params.n_storages)
     ),
     "soc",
@@ -222,6 +252,8 @@ for t in range(1, params.n_stages):
                 == soc[t - 1, a_n, s]
                 + params.eff_c[s] * ys_charge[t, n, s]
                 - ys_discharge[t, n, s]
+                + socs_p[t, n, s]
+                - socs_n[t, n, s]
                 for s in range(params.n_storages)
             ),
             "soc",
@@ -229,7 +261,7 @@ for t in range(1, params.n_stages):
 # t=T
 t = params.n_stages - 1
 model.addConstrs(
-    soc[t, n.index, s] == soc_init[s] + socs_p[n.index, s] - socs_n[n.index, s]
+    soc[t, n.index, s] == soc_init[s] + socs_fin_p[n.index, s] - socs_fin_n[n.index, s]
     for s in range(params.n_storages)
     for n in scenario_tree.get_stage_nodes(t)
 )
@@ -257,12 +289,18 @@ for t in range(params.n_stages):
             for l in range(params.n_lines)
         ]
         model.addConstrs(
-            (line_flows[l] <= params.pl_max[l] for l in range(params.n_lines)),
+            (
+                line_flows[l] <= params.pl_max[l] + delta[t, n]
+                for l in range(params.n_lines)
+            ),
             "power-flow(1)",
         )
         model.addConstrs(
-            (-line_flows[l] <= params.pl_max[l] for l in range(params.n_lines)),
-            "power-flow(2)",
+            (
+                -line_flows[l] <= params.pl_max[l] + delta[t, n]
+                for l in range(params.n_lines)
+            ),
+            f"power-flow(2)",
         )
 
 
@@ -272,15 +310,18 @@ print("Adding start-up and shut-down constraints...")
 # t=0
 x_init = [0] * params.n_gens
 model.addConstrs(
-    (x[0, 0, g] - x_init[g] <= s_up[0, 0, g] for g in range(params.n_gens)),
-    "up-down(1)",
+    (
+        x[0, 0, g] - x_init[g] <= s_up[0, 0, g] + delta[0, 0]
+        for g in range(params.n_gens)
+    ),
+    "startup",
 )
 model.addConstrs(
     (
-        x[0, 0, g] - x_init[g] == s_up[0, 0, g] - s_down[0, 0, g]
+        x_init[g] - x[0, 0, g] <= s_down[0, 0, g] + delta[0, 0]
         for g in range(params.n_gens)
     ),
-    "up-down(2)",
+    "shutdown",
 )
 # t>0
 for t in range(1, params.n_stages):
@@ -289,17 +330,17 @@ for t in range(1, params.n_stages):
         a_n = node.parent.index
         model.addConstrs(
             (
-                x[t, n, g] - x[t - 1, a_n, g] <= s_up[t, n, g]
+                x[t, n, g] - x[t - 1, a_n, g] <= s_up[t, n, g] + delta[t, n]
                 for g in range(params.n_gens)
             ),
-            "up-down(1)",
+            "startup",
         )
         model.addConstrs(
             (
-                x[t, n, g] - x[t - 1, a_n, g] == s_up[t, n, g] - s_down[t, n, g]
+                x[t - 1, a_n, g] - x[t, n, g] <= s_down[t, n, g] + delta[t, n]
                 for g in range(params.n_gens)
             ),
-            "up-down(2)",
+            "shutdown",
         )
 
 # Ramp rate constraints
@@ -308,11 +349,22 @@ print("Adding ramp rate constraints...")
 # t=0
 y_init = [0] * params.n_gens
 model.addConstrs(
-    (y[0, 0, g] - y_init[g] <= params.r_up[g] for g in range(params.n_gens)), "rate-up",
+    (
+        y[0, 0, g] - y_init[g]
+        <= params.r_up[g] * x_init[g] + params.r_su[g] * s_up[0, 0, g] + delta[0, 0]
+        for g in range(params.n_gens)
+    ),
+    "rate-up",
 )
 model.addConstrs(
-    (y_init[g] - y[0, 0, g] <= params.r_down[g] for g in range(params.n_gens)),
-    "rate-down(2)",
+    (
+        y_init[g] - y[0, 0, g]
+        <= params.r_down[g] * x[0, 0, g]
+        + params.r_sd[g] * s_down[0, 0, g]
+        + delta[0, 0]
+        for g in range(params.n_gens)
+    ),
+    "rate-down",
 )
 # t>0
 for t in range(1, params.n_stages):
@@ -321,14 +373,20 @@ for t in range(1, params.n_stages):
         a_n = node.parent.index
         model.addConstrs(
             (
-                y[t, n, g] - y[t - 1, a_n, g] <= params.r_up[g]
+                y[t, n, g] - y[t - 1, a_n, g]
+                <= params.r_up[g] * x[t - 1, a_n, g]
+                + params.r_su[g] * s_up[t, n, g]
+                + delta[t, n]
                 for g in range(params.n_gens)
             ),
             "rate-up",
         )
         model.addConstrs(
             (
-                y[t - 1, a_n, g] - y[t, n, g] <= params.r_down[g]
+                y[t - 1, a_n, g] - y[t, n, g]
+                <= params.r_down[g] * x[t, n, g]
+                + params.r_sd[g] * s_down[t, n, g]
+                + delta[t, n]
                 for g in range(params.n_gens)
             ),
             "rate-down",
@@ -346,7 +404,7 @@ for g in range(params.n_gens):
             model.addConstr(
                 (
                     gp.quicksum(x[m.stage, m.index, g] for m in ancestors)
-                    >= (t + 1) * s_down[t, n, g]
+                    >= (t + 1) * s_down[t, n, g] - delta[t, n]
                 ),
                 "min-uptime",
             )
@@ -358,7 +416,7 @@ for g in range(params.n_gens):
             model.addConstr(
                 (
                     gp.quicksum(x[m.stage, m.index, g] for m in ancestors)
-                    >= params.min_up_time[g] * s_down[t, n, g]
+                    >= params.min_up_time[g] * s_down[t, n, g] - delta[t, n]
                 ),
                 "min-uptime",
             )
@@ -370,7 +428,7 @@ for g in range(params.n_gens):
             model.addConstr(
                 (
                     gp.quicksum((1 - x[m.stage, m.index, g]) for m in ancestors)
-                    >= (t + 1) * s_up[t, n, g]
+                    >= (t + 1) * s_up[t, n, g] - delta[t, n]
                 ),
                 "min-downtime",
             )
@@ -382,7 +440,7 @@ for g in range(params.n_gens):
             model.addConstr(
                 (
                     gp.quicksum((1 - x[m.stage, m.index, g]) for m in ancestors)
-                    >= params.min_down_time[g] * s_up[t, n, g]
+                    >= params.min_down_time[g] * s_up[t, n, g] - delta[t, n]
                 ),
                 "min-downtime",
             )
@@ -400,15 +458,23 @@ model.setParam("TimeLimit", 5 * 60 * 60)
 print("Solving process started...")
 model_solving_start_time = time()
 model.optimize()
+
+# model.computeIIS()
+# model.write("model.ilp")
+# model.display()
+
 runtime_logger.log_task_end("model_solving", model_solving_start_time)
 
-slack_variables = [ys_p, ys_n, socs_p, socs_n]
+slack_variables = [ys_p, ys_n, socs_p, socs_n, socs_fin_n, socs_fin_p, delta]
 total_slack = 0
 for variable in slack_variables:
     total_slack += sum([slack.x for _, slack in variable.items()])
 
-# model.setParam("OutputFlag", 1)
-# model.display()
+print(sum([slack.x for _, slack in delta.items()]))
+print(sum([slack.x for _, slack in socs_fin_n.items()]))
+print(sum([slack.x for _, slack in socs_fin_p.items()]))
+print(sum([slack.x for _, slack in socs_p.items()]))
+print(sum([slack.x for _, slack in socs_n.items()]))
 
 print("Solving finished.")
 print(f"Optimal value: {obj.getValue()}")

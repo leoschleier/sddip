@@ -81,7 +81,7 @@ for t in range(params.n_stages):
             vtype=gp.GRB.CONTINUOUS, lb=0, name=f"ys_n_{t+1}_{n+1}"
         )
         delta[t, n] = model.addVar(
-            vtype=gp.GRB.CONTINUOUS, lb=0, name=f"d_g_p_{t+1}_{n+1}"
+            vtype=gp.GRB.CONTINUOUS, lb=0, name=f"delta_{t+1}_{n+1}"
         )
 
 
@@ -220,8 +220,8 @@ model.addConstrs(
     ),
     "soc",
 )
-# 0<t<T
-for t in range(1, params.n_stages - 1):
+# t>0
+for t in range(1, params.n_stages):
     for node in scenario_tree.get_stage_nodes(t):
         n = node.index
         a_n = node.parent.index
@@ -245,7 +245,7 @@ model.addConstrs(
         for s in range(params.n_storages)
         for n in scenario_tree.get_stage_nodes(t)
     ),
-    "soc",
+    "soc-final",
 )
 
 # Power flow constraints
@@ -434,7 +434,7 @@ runtime_logger.log_task_end(f"model_building", model_building_start_time)
 ########################################################################################################################
 # Solving procedure
 ########################################################################################################################
-model.setParam("OutputFlag", 0)
+model.setParam("OutputFlag", 1)
 model.setParam("TimeLimit", 5 * 60 * 60)
 
 print("Solving process started...")
@@ -443,7 +443,7 @@ model.optimize()
 
 # model.computeIIS()
 # model.write("model.ilp")
-# model.display()
+model.display()
 
 runtime_logger.log_task_end("model_solving", model_solving_start_time)
 
@@ -456,11 +456,21 @@ for variable in slack_variables:
 # print(sum([slack.x for _, slack in socs_p.items()]))
 # print(sum([slack.x for _, slack in socs_n.items()]))
 
+print("Charge")
+print(ys_charge[0, 0, 0].x)
+print(ys_charge[1, 0, 0].x)
+print(ys_charge[1, 1, 0].x)
+print(ys_charge[1, 2, 0].x)
+print("Discharge")
 print(ys_discharge[0, 0, 0].x)
 print(ys_discharge[1, 0, 0].x)
 print(ys_discharge[1, 1, 0].x)
 print(ys_discharge[1, 2, 0].x)
-
+print("SOC")
+print(soc[0, 0, 0].x)
+print(soc[1, 0, 0].x)
+print(soc[1, 1, 0].x)
+print(soc[1, 2, 0].x)
 
 print("Solving finished.")
 print(f"Optimal value: {obj.getValue()}")

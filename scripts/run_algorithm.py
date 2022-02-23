@@ -3,9 +3,10 @@ from sddip import algorithm, logger, storage
 
 # Parameters
 test_case = "case6ww"
-n_iterations = 20
+n_iterations = 6
 init_n_binaries = 10
 init_n_samples = 1
+init_cut_mode = "b"
 big_m = 10 ** 3
 sos = False
 
@@ -16,7 +17,7 @@ log_dir = log_manager.create_log_dir("log")
 
 
 # Execution
-algo = algorithm.SddipAlgorithm(test_case, log_dir, method="bm")
+algo = algorithm.SddipAlgorithm(test_case, log_dir, method="bm", cut_mode=init_cut_mode)
 algo.big_m = big_m
 algo.n_binaries = init_n_binaries
 if init_n_samples:

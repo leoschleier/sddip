@@ -122,6 +122,7 @@ class ModelBuilder(ABC):
         )
         self.ys_p = self.model.addVar(vtype=gp.GRB.CONTINUOUS, lb=0, name="ys_p")
         self.ys_n = self.model.addVar(vtype=gp.GRB.CONTINUOUS, lb=0, name="ys_n")
+        self.delta = self.model.addVar(vtype=gp.GRB.CONTINUOUS, lb=0, name="delta")
         self.model.update()
 
     def initialize_copy_variables(self):
@@ -160,11 +161,11 @@ class ModelBuilder(ABC):
             )
         self.model.update()
 
-    def add_objective(self, coefficients: list, include_soc_slack: bool = False):
+    def add_objective(self, coefficients: list):
 
-        penalty = coefficients[-1] if include_soc_slack else 0
+        penalty = coefficients[-1]
 
-        coefficients = coefficients + [penalty] * 2 * self.n_storages + [1]
+        coefficients = coefficients + [penalty] * (2 * self.n_storages + 1) + [1]
 
         variables = (
             self.y
@@ -173,9 +174,11 @@ class ModelBuilder(ABC):
             + [self.ys_p, self.ys_n]
             + self.socs_p
             + self.socs_n
+            + [self.delta]
             + [self.theta]
         )
         self.objective_terms = gp.LinExpr(coefficients, variables)
+
         self.model.setObjective(self.objective_terms)
         self.update_model()
 
@@ -201,14 +204,14 @@ class ModelBuilder(ABC):
     def add_generator_constraints(self, min_generation: list, max_generation: list):
         self.model.addConstrs(
             (
-                self.y[g] >= min_generation[g] * self.x[g]
+                self.y[g] >= min_generation[g] * self.x[g] - self.delta
                 for g in range(self.n_generators)
             ),
             "min-generation",
         )
         self.model.addConstrs(
             (
-                self.y[g] <= max_generation[g] * self.x[g]
+                self.y[g] <= max_generation[g] * self.x[g] + self.delta
                 for g in range(self.n_generators)
             ),
             "max-generation",
@@ -235,14 +238,19 @@ class ModelBuilder(ABC):
         )
 
         self.model.addConstrs(
-            (self.soc[s] <= max_soc[s] for s in range(self.n_storages)), "max-soc",
+            (self.soc[s] <= max_soc[s] + self.delta for s in range(self.n_storages)),
+            "max-soc",
         )
 
     def add_soc_transfer(self, charge_eff: list):
         self.model.addConstrs(
             (
                 self.soc[s]
-                == self.z_soc[s] + charge_eff[s] * self.ys_c[s] - self.ys_dc[s]
+                == self.z_soc[s]
+                + charge_eff[s] * self.ys_c[s]
+                - self.ys_dc[s]
+                + self.socs_p[s]
+                - self.socs_n[s]
                 for s in range(self.n_storages)
             ),
             "soc",
@@ -250,10 +258,7 @@ class ModelBuilder(ABC):
 
     def add_final_soc_constraints(self, final_soc: list):
         self.model.addConstrs(
-            (
-                self.soc[s] + self.socs_p[s] - self.socs_n[s] == final_soc[s]
-                for s in range(self.n_storages)
-            ),
+            (self.soc[s] >= final_soc[s] - self.delta for s in range(self.n_storages)),
             "final soc",
         )
 
@@ -282,23 +287,32 @@ class ModelBuilder(ABC):
             for l in range(self.n_lines)
         ]
         self.model.addConstrs(
-            (line_flows[l] <= max_line_capacities[l] for l in range(self.n_lines)),
+            (
+                line_flows[l] <= max_line_capacities[l] + self.delta
+                for l in range(self.n_lines)
+            ),
             "power-flow(1)",
         )
         self.model.addConstrs(
-            (-line_flows[l] <= max_line_capacities[l] for l in range(self.n_lines)),
+            (
+                -line_flows[l] <= max_line_capacities[l] + self.delta
+                for l in range(self.n_lines)
+            ),
             "power-flow(2)",
         )
         self.update_model()
 
     def add_startup_shutdown_constraints(self):
         self.model.addConstrs(
-            (self.x[g] - self.z_x[g] <= self.s_up[g] for g in range(self.n_generators)),
+            (
+                self.x[g] - self.z_x[g] <= self.s_up[g] + self.delta
+                for g in range(self.n_generators)
+            ),
             "start-up",
         )
         self.model.addConstrs(
             (
-                self.z_x[g] - self.x[g] <= self.s_down[g]
+                self.z_x[g] - self.x[g] <= self.s_down[g] + self.delta
                 for g in range(self.n_generators)
             ),
             "shut-down",
@@ -315,7 +329,9 @@ class ModelBuilder(ABC):
         self.model.addConstrs(
             (
                 self.y[g] - self.z_y[g]
-                <= max_rate_up[g] * self.z_x[g] + startup_rate[g] * self.s_up[g]
+                <= max_rate_up[g] * self.z_x[g]
+                + startup_rate[g] * self.s_up[g]
+                + self.delta
                 for g in range(self.n_generators)
             ),
             "rate-up",
@@ -323,7 +339,9 @@ class ModelBuilder(ABC):
         self.model.addConstrs(
             (
                 self.z_y[g] - self.y[g]
-                <= max_rate_down[g] * self.x[g] + shutdown_rate[g] * self.s_down[g]
+                <= max_rate_down[g] * self.x[g]
+                + shutdown_rate[g] * self.s_down[g]
+                + self.delta
                 for g in range(self.n_generators)
             ),
             "rate-down",
@@ -332,7 +350,8 @@ class ModelBuilder(ABC):
     def add_up_down_time_constraints(self, min_up_times: list, min_down_times: list):
         self.model.addConstrs(
             (
-                gp.quicksum(self.z_x_bs[g]) >= min_up_times[g] * self.s_down[g]
+                gp.quicksum(self.z_x_bs[g])
+                >= min_up_times[g] * self.s_down[g] - self.delta
                 for g in range(self.n_generators)
             ),
             "up-time",
@@ -341,7 +360,7 @@ class ModelBuilder(ABC):
         self.model.addConstrs(
             (
                 len(self.z_x_bs[g]) - gp.quicksum(self.z_x_bs[g])
-                >= min_down_times[g] * self.s_up[g]
+                >= min_down_times[g] * self.s_up[g] - self.delta
                 for g in range(self.n_generators)
             ),
             "down-time",
@@ -383,6 +402,10 @@ class ModelBuilder(ABC):
             self.x + self.y + [var for gen_bs in self.x_bs for var in gen_bs] + self.soc
         )
         n_state_variables = len(state_variables)
+
+        if not n_state_variables == len(trial_point):
+            raise ValueError("asdf")
+        # print(cut_gradient)
 
         self.model.addConstr(
             (
@@ -601,6 +624,26 @@ class ForwardModelBuilder(ModelBuilder):
         )
         self.update_model()
 
+    def get_copy_terms(
+        self,
+        x_trial_point: list,
+        y_trial_point: list,
+        x_bs_trial_point: list[list],
+        soc_trial_point: list,
+    ):
+        copy_terms = [self.z_x[g] - x_trial_point[g] for g in range(self.n_generators)]
+        copy_terms += [self.z_y[g] - y_trial_point[g] for g in range(self.n_generators)]
+        copy_terms += [
+            self.z_x_bs[g][k] - x_bs_trial_point[g][k]
+            for g in range(self.n_generators)
+            for k in range(self.backsight_periods[g])
+        ]
+        copy_terms += [
+            self.z_soc[s] - soc_trial_point[s] for s in range(self.n_storages)
+        ]
+
+        return copy_terms
+
 
 class BackwardModelBuilder(ModelBuilder):
     def __init__(
@@ -718,7 +761,7 @@ class BackwardModelBuilder(ModelBuilder):
     ):
         self.check_bin_copy_vars_not_empty()
 
-        self.relaxed_terms += [
+        self.relaxed_terms = [
             x_binary_trial_point[j] - self.x_bin_copy_vars[j]
             for j in range(self.n_x_trial_binaries)
         ]

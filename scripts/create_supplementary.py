@@ -4,7 +4,7 @@ import pandas as pd
 from sddip import config
 
 # TODO Select parameters for data generation
-test_case_raw_dir = "WB3/raw"
+test_case_raw_dir = "case6ww/raw"
 
 # Ramp rate
 # (%/100 of rated capacity per unit time)

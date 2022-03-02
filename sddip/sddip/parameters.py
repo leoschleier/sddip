@@ -161,7 +161,7 @@ class Parameters:
         self.eff_dc = self.storage_df["Effdc"].values.tolist()
 
         # TODO Adjust penalty for slack variables
-        self.penalty = 5000
+        self.penalty = 1000
 
         self.cost_coeffs = (
             self.gc.tolist()

@@ -81,7 +81,7 @@ class ModelBuilder(ABC):
 
         for g in range(self.n_generators):
             self.x.append(
-                self.model.addVar(vtype=bin_type, ub=1, name="x_%i" % (g + 1))
+                self.model.addVar(vtype=bin_type, lb=0, ub=1, name="x_%i" % (g + 1))
             )
             self.y.append(
                 self.model.addVar(vtype=gp.GRB.CONTINUOUS, lb=0, name="y_%i" % (g + 1))
@@ -89,16 +89,18 @@ class ModelBuilder(ABC):
             self.x_bs.append(
                 [
                     self.model.addVar(
-                        vtype=bin_type, ub=1, name="x_bs_%i_%i" % (g + 1, k + 1),
+                        vtype=bin_type, lb=0, ub=1, name="x_bs_%i_%i" % (g + 1, k + 1),
                     )
                     for k in range(self.backsight_periods[g])
                 ]
             )
             self.s_up.append(
-                self.model.addVar(vtype=bin_type, ub=1, name="s_up_%i" % (g + 1))
+                self.model.addVar(vtype=bin_type, lb=0, ub=1, name="s_up_%i" % (g + 1))
             )
             self.s_down.append(
-                self.model.addVar(vtype=bin_type, ub=1, name="s_down_%i" % (g + 1))
+                self.model.addVar(
+                    vtype=bin_type, lb=0, ub=1, name="s_down_%i" % (g + 1)
+                )
             )
         for s in range(self.n_storages):
             self.ys_c.append(
@@ -107,7 +109,9 @@ class ModelBuilder(ABC):
             self.ys_dc.append(
                 self.model.addVar(vtype=gp.GRB.CONTINUOUS, lb=0, name=f"y_dc_{s+1}")
             )
-            self.u_c_dc.append(self.model.addVar(vtype=bin_type, ub=1, name=f"u_{s+1}"))
+            self.u_c_dc.append(
+                self.model.addVar(vtype=bin_type, lb=0, ub=1, name=f"u_{s+1}")
+            )
             self.soc.append(
                 self.model.addVar(vtype=gp.GRB.CONTINUOUS, lb=0, name=f"soc_{s+1}")
             )
@@ -123,7 +127,11 @@ class ModelBuilder(ABC):
         self.ys_p = self.model.addVar(vtype=gp.GRB.CONTINUOUS, lb=0, name="ys_p")
         self.ys_n = self.model.addVar(vtype=gp.GRB.CONTINUOUS, lb=0, name="ys_n")
         self.delta = self.model.addVar(vtype=gp.GRB.CONTINUOUS, lb=0, name="delta")
+        self.model.addConstr(self.delta == 0)
         self.model.update()
+
+        # self.model.addConstrs(self.socs_p[s] == 0 for s in range(self.n_storages))
+        # self.model.addConstrs(self.socs_n[s] == 0 for s in range(self.n_storages))
 
     def initialize_copy_variables(self):
         for g in range(self.n_generators):
@@ -416,7 +424,7 @@ class ModelBuilder(ABC):
                     for i in range(n_state_variables)
                 )
             ),
-            f"benders_cut",
+            f"benders-cut",
         )
 
     def add_cut_constraints(
@@ -602,11 +610,11 @@ class ForwardModelBuilder(ModelBuilder):
         x_bs_trial_point: list[list],
         soc_trial_point: list,
     ):
-        self.copy_constraints_y = self.model.addConstrs(
+        self.copy_constraints_x = self.model.addConstrs(
             (self.z_x[g] == x_trial_point[g] for g in range(self.n_generators)),
             "copy-x",
         )
-        self.copy_constraints_x = self.model.addConstrs(
+        self.copy_constraints_y = self.model.addConstrs(
             (self.z_y[g] == y_trial_point[g] for g in range(self.n_generators)),
             "copy-y",
         )
@@ -631,15 +639,15 @@ class ForwardModelBuilder(ModelBuilder):
         x_bs_trial_point: list[list],
         soc_trial_point: list,
     ):
-        copy_terms = [self.z_x[g] - x_trial_point[g] for g in range(self.n_generators)]
-        copy_terms += [self.z_y[g] - y_trial_point[g] for g in range(self.n_generators)]
+        copy_terms = [x_trial_point[g] - self.z_x[g] for g in range(self.n_generators)]
+        copy_terms += [y_trial_point[g] - self.z_y[g] for g in range(self.n_generators)]
         copy_terms += [
-            self.z_x_bs[g][k] - x_bs_trial_point[g][k]
+            x_bs_trial_point[g][k] - self.z_x_bs[g][k]
             for g in range(self.n_generators)
             for k in range(self.backsight_periods[g])
         ]
         copy_terms += [
-            self.z_soc[s] - soc_trial_point[s] for s in range(self.n_storages)
+            soc_trial_point[s] - self.z_soc[s] for s in range(self.n_storages)
         ]
 
         return copy_terms

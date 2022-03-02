@@ -47,7 +47,7 @@ class SddipAlgorithm:
             self.problem_params.n_realizations_per_stage[1],
         )
 
-        ds_max_iterations = 1000
+        ds_max_iterations = 500
 
         if method == "sg":
             self.dual_solver = dualsolver.SubgradientMethod(
@@ -108,6 +108,7 @@ class SddipAlgorithm:
             sampling_start_time = time()
             n_samples = self.n_samples
             samples = self.sc_sampler.generate_samples(n_samples)
+            print(f"Samples: {samples}")
             self.runtime_logger.log_task_end(f"sampling_i{i+1}", sampling_start_time)
 
             ########################################
@@ -142,6 +143,8 @@ class SddipAlgorithm:
             # Backward pass
             ########################################
             backward_pass_start_time = time()
+            if i == 10:
+                self.cut_mode = "l"
             if self.cut_mode == "l":
                 self.backward_pass(i + 1, samples)
             elif self.cut_mode in ["b", "sb"]:
@@ -169,7 +172,7 @@ class SddipAlgorithm:
 
             # Increase number of samples
             if self.n_samples < self.max_n_samples:
-                self.n_samples += 1
+                self.n_samples += 0
 
         self.runtime_logger.log_experiment_end()
         self.dual_solver.runtime_logger.log_experiment_end()
@@ -228,6 +231,10 @@ class SddipAlgorithm:
                 # Solve problem
                 uc_fw.disable_output()
                 uc_fw.model.optimize()
+                # if i == 5:
+                #     print(f"{t}, {n}")
+                #     uc_fw.enable_output()
+                #     uc_fw.model.printAttr("X")
 
                 x_kt = [x_g.x for x_g in uc_fw.x]
                 y_kt = [y_g.x for y_g in uc_fw.y]
@@ -312,9 +319,10 @@ class SddipAlgorithm:
         refinement_condition = delta <= self.refinement_tolerance
 
         if refinement_condition:
-            print("Refinement performed.")
-            self.cut_mode = "l"
-            self.n_binaries += 1
+            if self.cut_mode == "l":
+                print("Refinement performed.")
+            #     self.n_binaries += 1
+            # self.cut_mode = "l"
 
     def backward_pass(self, iteration: int, samples: list):
         i = iteration
@@ -497,6 +505,7 @@ class SddipAlgorithm:
                     + [val for bs in x_bs_trial_point for val in bs]
                     + soc_trial_point
                 )
+                print(f"TP: {trial_point}")
 
                 dual_multipliers = []
                 opt_values = []
@@ -526,31 +535,9 @@ class SddipAlgorithm:
                     )
 
                     uc_fw.model.optimize()
-
-                    # Solve problem
-                    # lp_rlx = uc_fw.model.relax()
-                    # lp_rlx.optimize()
-
-                    # constr_names = []
-                    # constr_names += [
-                    #     constr.getAttr(gp.GRB.attr.ConstrName)
-                    #     for constr in uc_fw.copy_constraints_x
-                    # ]
-                    # constr_names += [
-                    #     constr.getAttr(gp.GRB.attr.ConstrName)
-                    #     for constr in uc_fw.copy_constraints_y
-                    # ]
-                    # constr_names += [
-                    #     constr.getAttr(gp.GRB.attr.ConstrName)
-                    #     for constr in uc_fw.copy_constraints_x_bs
-                    # ]
-                    # constr_names += [
-                    #     constr.getAttr(gp.GRB.attr.ConstrName)
-                    #     for constr in uc_fw.copy_constraints_soc
-                    # ]
-
-                    if self.cut_mode == "b":
-                        opt_values.append(uc_fw.model.getObjective().getValue())
+                    # if i == 1 and t == 1 and k == 0 and n == 0:
+                    #     uc_fw.enable_output()
+                    #     uc_fw.model.display()
 
                     copy_constrs = [
                         uc_fw.copy_constraints_x,
@@ -565,10 +552,12 @@ class SddipAlgorithm:
                             constr.getAttr(gp.GRB.attr.Pi)
                             for _, constr in constr_set.items()
                         ]
-                    print(dm)
+                    # print(dm)
                     dual_multipliers.append(dm)
 
-                    if self.cut_mode == "sb":
+                    if self.cut_mode == "b":
+                        opt_values.append(uc_fw.model.getObjective().getValue())
+                    elif self.cut_mode == "sb":
                         model = ucmodel.ForwardModelBuilder(
                             self.problem_params.n_buses,
                             self.problem_params.n_lines,
@@ -594,8 +583,8 @@ class SddipAlgorithm:
                         )
                         opt_values.append(dual_value)
 
-                print(dual_multipliers)
-                print(opt_values)
+                # print(f"DM: {dual_multipliers}")
+                # print(f"V: {opt_values}")
 
                 opt_values = np.array(opt_values)
                 dual_multipliers = np.array(dual_multipliers)
@@ -604,7 +593,7 @@ class SddipAlgorithm:
 
                 bc_dict[ResultKeys.bc_intercept_key] = v
                 bc_dict[ResultKeys.bc_gradient_key] = pi.tolist()
-                bc_dict[ResultKeys.bc_trial_point_key] = trial_point
+                bc_dict[ResultKeys.bc_trial_point_key] = [t for t in trial_point]
 
                 self.bc_storage.add_result(i, k, t - 1, bc_dict)
 
@@ -640,10 +629,10 @@ class SddipAlgorithm:
         # Solve problem
         uc_fw.disable_output()
         uc_fw.model.optimize()
-        if i == 5:
-            uc_fw.enable_output()
-            uc_fw.model.printAttr("X")
-            uc_fw.model.display()
+        # if i == 5:
+        #     uc_fw.enable_output()
+        #     uc_fw.model.printAttr("X")
+        #     uc_fw.model.display()
 
         # Value of stage t objective function
         v_lower = uc_fw.model.getObjective().getValue()

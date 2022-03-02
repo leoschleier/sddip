@@ -107,21 +107,28 @@ obj_gen = gp.quicksum(
         params.gc[g] * y[t, n, g]
         + params.suc[g] * s_up[t, n, g]
         + params.sdc[g] * s_down[t, n, g]
-        + params.penalty * (ys_p[t, n] + ys_n[t, n] + delta[t, n])
     )
     for t in range(params.n_stages)
     for n in range(scenario_tree.n_nodes_per_stage[t])
     for g in range(params.n_gens)
 )
 
-obj_stge = gp.quicksum(
+penalty_gen = gp.quicksum(
+    conditional_probabilities[t]
+    * params.penalty
+    * (ys_p[t, n] + ys_n[t, n] + delta[t, n])
+    for t in range(params.n_stages)
+    for n in range(scenario_tree.n_nodes_per_stage[t])
+)
+
+penalty_stge = gp.quicksum(
     conditional_probabilities[t] * params.penalty * (socs_n[t, n, s] + socs_p[t, n, s])
     for t in range(params.n_stages)
     for n in range(scenario_tree.n_nodes_per_stage[t])
     for s in range(params.n_storages)
 )
 
-obj = obj_gen + obj_stge
+obj = obj_gen + penalty_gen + penalty_stge
 
 model.setObjective(obj)
 
@@ -434,7 +441,7 @@ runtime_logger.log_task_end(f"model_building", model_building_start_time)
 ########################################################################################################################
 # Solving procedure
 ########################################################################################################################
-model.setParam("OutputFlag", 1)
+model.setParam("OutputFlag", 0)
 model.setParam("TimeLimit", 5 * 60 * 60)
 
 print("Solving process started...")
@@ -443,7 +450,8 @@ model.optimize()
 
 # model.computeIIS()
 # model.write("model.ilp")
-model.display()
+# model.display()
+# model.printAttr("X")
 
 runtime_logger.log_task_end("model_solving", model_solving_start_time)
 
@@ -456,21 +464,22 @@ for variable in slack_variables:
 # print(sum([slack.x for _, slack in socs_p.items()]))
 # print(sum([slack.x for _, slack in socs_n.items()]))
 
-print("Charge")
-print(ys_charge[0, 0, 0].x)
-print(ys_charge[1, 0, 0].x)
-print(ys_charge[1, 1, 0].x)
-print(ys_charge[1, 2, 0].x)
-print("Discharge")
-print(ys_discharge[0, 0, 0].x)
-print(ys_discharge[1, 0, 0].x)
-print(ys_discharge[1, 1, 0].x)
-print(ys_discharge[1, 2, 0].x)
-print("SOC")
-print(soc[0, 0, 0].x)
-print(soc[1, 0, 0].x)
-print(soc[1, 1, 0].x)
-print(soc[1, 2, 0].x)
+# print("Charge")
+# print(ys_charge[0, 0, 0].x)
+# print(ys_charge[1, 0, 0].x)
+# print(ys_charge[1, 1, 0].x)
+# print(ys_charge[1, 2, 0].x)
+# print("Discharge")
+# print(ys_discharge[0, 0, 0].x)
+# print(ys_discharge[1, 0, 0].x)
+# print(ys_discharge[1, 1, 0].x)
+# print(ys_discharge[1, 2, 0].x)
+# print("SOC")
+# print(soc[0, 0, 0].x)
+# print(soc[1, 0, 0].x)
+# print(soc[1, 1, 0].x)
+# print(soc[1, 2, 0].x)
+
 
 print("Solving finished.")
 print(f"Optimal value: {obj.getValue()}")

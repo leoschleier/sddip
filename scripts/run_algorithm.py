@@ -3,12 +3,12 @@ from sddip import algorithm, logger, storage
 
 # Parameters
 test_case = "case6ww"
-n_iterations = 6
+n_iterations = 12
 init_n_binaries = 10
 init_n_samples = 1
 init_cut_mode = "b"
 big_m = 10 ** 3
-sos = False
+sos = True
 
 
 # Logger
@@ -30,11 +30,15 @@ try:
 except KeyboardInterrupt as e:
     print("Shutdown request ... exiting")
 finally:
-    # Manage results
-    results_manager = storage.ResultsManager()
-    results_dir = results_manager.create_results_dir("results")
+    try:
+        # Manage results
+        results_manager = storage.ResultsManager()
+        results_dir = results_manager.create_results_dir("results")
+        algo.bound_storage.export_results(results_dir)
+        algo.ps_storage.export_results(results_dir)
+        algo.bc_storage.export_results(results_dir)
+        algo.ds_storage.export_results(results_dir)
+        algo.cc_storage.export_results(results_dir)
+    except ValueError:
+        print("Export incomplete.")
 
-    algo.ps_storage.export_results(results_dir)
-    algo.ds_storage.export_results(results_dir)
-    algo.cc_storage.export_results(results_dir)
-    algo.bound_storage.export_results(results_dir)

@@ -127,9 +127,8 @@ class ModelBuilder(ABC):
         self.ys_p = self.model.addVar(vtype=gp.GRB.CONTINUOUS, lb=0, name="ys_p")
         self.ys_n = self.model.addVar(vtype=gp.GRB.CONTINUOUS, lb=0, name="ys_n")
         self.delta = self.model.addVar(vtype=gp.GRB.CONTINUOUS, lb=0, name="delta")
-        self.model.addConstr(self.delta == 0)
         self.model.update()
-
+        # self.model.addConstr(self.delta == 0)
         # self.model.addConstrs(self.socs_p[s] == 0 for s in range(self.n_storages))
         # self.model.addConstrs(self.socs_n[s] == 0 for s in range(self.n_storages))
 

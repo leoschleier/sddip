@@ -32,9 +32,10 @@ class SddipAlgorithm:
         # Algorithm paramters
         self.max_n_samples = min(30, self.problem_params.n_scenarios)
         self.n_samples = self.max_n_samples
+        self.n_samples_leap = 0
         self.n_binaries = 10
         self.error_threshold = 10 ** (-1)
-        self.max_n_binaries = 15
+        self.max_n_binaries = 10
         # Relative change in lower bound
         self.refinement_tolerance = 10 ** (-2)
         self.big_m = 10 ** 6
@@ -77,6 +78,9 @@ class SddipAlgorithm:
         )
         self.bc_storage = storage.ResultStorage(
             ResultKeys.benders_cut_keys, "benders_cuts"
+        )
+        self.dual_solver_storage = storage.ResultStorage(
+            ResultKeys.dual_solver_keys, "dual_solver"
         )
 
         self.bound_storage = storage.ResultStorage(ResultKeys.bound_keys, "bounds")
@@ -143,8 +147,6 @@ class SddipAlgorithm:
             # Backward pass
             ########################################
             backward_pass_start_time = time()
-            if i == 10:
-                self.cut_mode = "l"
             if self.cut_mode == "l":
                 self.backward_pass(i + 1, samples)
             elif self.cut_mode in ["b", "sb"]:
@@ -172,7 +174,7 @@ class SddipAlgorithm:
 
             # Increase number of samples
             if self.n_samples < self.max_n_samples:
-                self.n_samples += 0
+                self.n_samples += self.n_samples_leap
 
         self.runtime_logger.log_experiment_end()
         self.dual_solver.runtime_logger.log_experiment_end()
@@ -183,6 +185,7 @@ class SddipAlgorithm:
         n_samples = 30
         samples = self.sc_sampler.generate_samples(n_samples)
         v_opt_k = self.forward_pass(n_iterations, samples)
+        v_upper_l, v_upper_r = self.statistical_upper_bound(v_opt_k, n_samples)
 
         bound_dict = self.bound_storage.create_empty_result_dict()
         bound_dict[ResultKeys.lb_key] = 0
@@ -289,40 +292,34 @@ class SddipAlgorithm:
         return v_upper_l, v_uppper_r
 
     def binary_approximation_refinement(self, iteration: int, lower_bounds: list):
-        # TODO refinement condition
         # Check if forward pass solution i equals that in i-1
         upper_bounds = self.problem_params.pg_max + self.problem_params.soc_max
-
-        continuous_variables_precision = [
-            self.binarizer.calc_precision_from_n_binaries(ub, self.n_binaries)
-            for ub in upper_bounds
-        ]
-
-        continuous_variables_approx_error = [
-            self.binarizer.calc_max_abs_error(prec)
-            for prec in continuous_variables_precision
-        ]
-
-        print(f"Approximation errors: {continuous_variables_approx_error}")
 
         # errors_below_threshold = all(
         #     v <= self.error_threshold for v in continuous_variables_approx_error
         # )
 
-        # Check if refinement is required
-        if iteration <= 1 or self.n_binaries >= self.max_n_binaries:
-            return
-
         # Check if refinment condition holds
-        delta = abs((lower_bounds[-1] - lower_bounds[-2]) / lower_bounds[-2])
-
-        refinement_condition = delta <= self.refinement_tolerance
+        refinement_condition = False
+        if not (iteration <= 1 or self.n_binaries >= self.max_n_binaries):
+            delta = abs((lower_bounds[-1] - lower_bounds[-2]) / lower_bounds[-2])
+            refinement_condition = delta <= self.refinement_tolerance
 
         if refinement_condition:
             if self.cut_mode == "l":
                 print("Refinement performed.")
-            #     self.n_binaries += 1
-            # self.cut_mode = "l"
+                self.n_binaries += 1
+            self.cut_mode = "l"
+
+        continuous_variables_precision = [
+            self.binarizer.calc_precision_from_n_binaries(ub, self.n_binaries)
+            for ub in upper_bounds
+        ]
+        continuous_variables_approx_error = [
+            self.binarizer.calc_max_abs_error(prec)
+            for prec in continuous_variables_precision
+        ]
+        print(f"Approximation errors: {continuous_variables_approx_error}")
 
     def backward_pass(self, iteration: int, samples: list):
         i = iteration
@@ -333,6 +330,7 @@ class SddipAlgorithm:
                 n_realizations = self.problem_params.n_realizations_per_stage[t]
                 ds_dict = self.ds_storage.create_empty_result_dict()
                 cc_dict = self.cc_storage.create_empty_result_dict()
+                dual_solver_dict = self.dual_solver_storage.create_empty_result_dict()
 
                 for n in range(n_realizations):
                     # Get mixed_integer trial points
@@ -436,32 +434,19 @@ class SddipAlgorithm:
                         binary_trial_point
                     )
 
-                    # print(f"Backward ys_p {t},{n}: {uc_bw.ys_p.x}")
-                    # print(f"Backward soc {t},{n}: {[s.x for s in uc_bw.soc]}")
-                    # print(f"Backward soc_n {t},{n}: {[s.x for s in uc_bw.socs_n]}")
-                    # print(f"Backward soc_p {t},{n}: {[s.x for s in uc_bw.socs_p]}")
-                    # print(f"Backward delta {t},{n}: {uc_bw.delta.x}")
-                    # print(f"Backward dc {t},{n}: {[s.x for s in uc_bw.ys_dc]}")
-                    # print(f"Backward c {t},{n}: {[s.x for s in uc_bw.ys_c]}")
-                    # model = uc_bw.model
-                    # model.setParam("OutputFlag", 1)
-                    # model.display()
-
-                    # print(f"t={t}")
-                    # print(f"SOC: {soc_binary_trial_point}")
-                    # print(f"y: {y_binary_trial_point}")
-                    # print(f"y: {y_binary_trial_multipliers}")
-                    # model.setParam("OutputFlag", 1)
-                    # model.printAttr("X")
-                    # if t == 1:
-                    #     model.display()
-
                     # Dual value and multiplier for each realization
-
                     ds_dict[ResultKeys.dv_key].append(dual_value)
                     ds_dict[ResultKeys.dm_key].append(dual_multipliers)
 
+                    dual_solver_dict[ResultKeys.ds_iterations].append(
+                        sg_results.n_iterations
+                    )
+                    dual_solver_dict[ResultKeys.ds_solver_time].append(
+                        sg_results.solver_time
+                    )
+
                 self.ds_storage.add_result(i, k, t, ds_dict)
+                self.dual_solver_storage.add_result(i, k, t, dual_solver_dict)
 
                 # Calculate and store cut coefficients
                 probabilities = self.problem_params.prob[t]
@@ -526,10 +511,7 @@ class SddipAlgorithm:
                     uc_fw: ucmodel.ForwardModelBuilder = self.add_problem_constraints(
                         uc_fw, t, n, i
                     )
-                    # print(f"x: {x_trial_point}")
-                    # print(f"y: {y_trial_point}")
-                    # print(f"xbs: {x_bs_trial_point}")
-                    # print(f"soc: {soc_trial_point}")
+
                     uc_fw.add_copy_constraints(
                         x_trial_point, y_trial_point, x_bs_trial_point, soc_trial_point,
                     )
@@ -629,10 +611,6 @@ class SddipAlgorithm:
         # Solve problem
         uc_fw.disable_output()
         uc_fw.model.optimize()
-        # if i == 5:
-        #     uc_fw.enable_output()
-        #     uc_fw.model.printAttr("X")
-        #     uc_fw.model.display()
 
         # Value of stage t objective function
         v_lower = uc_fw.model.getObjective().getValue()

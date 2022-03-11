@@ -31,7 +31,6 @@ class DualSolver(ABC):
     def get_subgradient_and_value(
         self, model, objective_terms, relaxed_terms, dual_multipliers
     ):
-        solver_start_time = time()
         gradient_len = len(relaxed_terms)
 
         total_objective = objective_terms + gp.quicksum(
@@ -40,12 +39,14 @@ class DualSolver(ABC):
 
         model.setObjective(total_objective)
         model.update()
+
+        solver_start_time = time()
         model.optimize()
+
+        self.solver_time += time() - solver_start_time
 
         subgradient = np.array([t.getValue() for t in relaxed_terms])
         opt_value = model.getObjective().getValue()
-
-        self.solver_time += time() - solver_start_time
 
         return (subgradient, opt_value)
 
@@ -186,7 +187,9 @@ class SubgradientMethod(DualSolver):
 
         self.log_task_end()
 
-        self.results.set_values(best_lower_bound, best_multipliers)
+        self.results.set_values(
+            best_lower_bound, best_multipliers, j + 1, self.solver_time
+        )
         return (model, self.results)
 
     def get_step_size(
@@ -333,11 +336,6 @@ class BundleMethod(DualSolver):
             # Calculate error
             delta = max(0, subproblem.getObjective().getValue() - opt_value_best)
 
-            # Check stopping criterion
-            if delta < self.tolerance:
-                tolerance_reached = True
-                break
-
             # Candidate optimal value
             subgradient, opt_value = self.get_subgradient_and_value(
                 model, objective_terms, relaxed_terms, dual_multipliers
@@ -345,12 +343,16 @@ class BundleMethod(DualSolver):
 
             # Update lowest known gradient magnitude
             lowest_gm = min(lowest_gm, np.linalg.norm(np.array(subgradient)))
-            # print(opt_value)
-            # print(opt_value_best)
+
             # Serious step
             if opt_value - opt_value_best >= self.alpha * delta:
                 dual_multipliers_best = copy.copy(dual_multipliers)
                 opt_value_best = copy.copy(opt_value)
+
+            # Check stopping criterion
+            if delta < self.tolerance:
+                tolerance_reached = True
+                break
 
         stop_reason = "Tolerance" if tolerance_reached else "Max iterations"
 
@@ -358,7 +360,9 @@ class BundleMethod(DualSolver):
 
         self.print_method_finished(stop_reason, i + 1, lowest_gm, opt_value_best)
 
-        self.results.set_values(opt_value_best, np.array(dual_multipliers_best))
+        self.results.set_values(
+            opt_value_best, np.array(dual_multipliers_best), i + 1, self.solver_time
+        )
 
         return (model, self.results)
 
@@ -378,7 +382,11 @@ class SolverResults:
     def __init__(self):
         self.obj_value = None
         self.multipliers = None
+        self.solver_time = None
+        self.n_iterations = None
 
-    def set_values(self, obj_value, multipliers):
+    def set_values(self, obj_value, multipliers, n_iterations, solver_time):
         self.obj_value = obj_value
         self.multipliers = multipliers
+        self.n_iterations = n_iterations
+        self.solver_time = solver_time

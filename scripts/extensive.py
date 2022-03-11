@@ -41,8 +41,6 @@ socs_p = {}
 socs_n = {}
 ys_p = {}
 ys_n = {}
-socs_fin_p = {}
-socs_fin_n = {}
 delta = {}
 
 for t in range(params.n_stages):
@@ -83,17 +81,7 @@ for t in range(params.n_stages):
             vtype=gp.GRB.CONTINUOUS, lb=0, name=f"ys_n_{t+1}_{n+1}"
         )
         delta[t, n] = model.addVar(
-            vtype=gp.GRB.CONTINUOUS, lb=0, name=f"d_g_p_{t+1}_{n+1}"
-        )
-
-for node in scenario_tree.get_stage_nodes(params.n_stages - 1):
-    n = node.index
-    for s in range(params.n_storages):
-        socs_fin_p[n, s] = model.addVar(
-            vtype=gp.GRB.CONTINUOUS, lb=0, name=f"socs_fin_p_{n+1}_{s+1}"
-        )
-        socs_fin_n[n, s] = model.addVar(
-            vtype=gp.GRB.CONTINUOUS, lb=0, name=f"socs_fin_n_{n+1}_{s+1}"
+            vtype=gp.GRB.CONTINUOUS, lb=0, name=f"delta_{t+1}_{n+1}"
         )
 
 
@@ -119,30 +107,28 @@ obj_gen = gp.quicksum(
         params.gc[g] * y[t, n, g]
         + params.suc[g] * s_up[t, n, g]
         + params.sdc[g] * s_down[t, n, g]
-        + params.penalty * (ys_p[t, n] + ys_n[t, n] + delta[t, n])
     )
     for t in range(params.n_stages)
     for n in range(scenario_tree.n_nodes_per_stage[t])
     for g in range(params.n_gens)
 )
 
-obj_stge = gp.quicksum(
+penalty_gen = gp.quicksum(
+    conditional_probabilities[t]
+    * params.penalty
+    * (ys_p[t, n] + ys_n[t, n] + delta[t, n])
+    for t in range(params.n_stages)
+    for n in range(scenario_tree.n_nodes_per_stage[t])
+)
+
+penalty_stge = gp.quicksum(
     conditional_probabilities[t] * params.penalty * (socs_n[t, n, s] + socs_p[t, n, s])
     for t in range(params.n_stages)
     for n in range(scenario_tree.n_nodes_per_stage[t])
     for s in range(params.n_storages)
-) + conditional_probabilities[params.n_stages - 1] * (
-    params.penalty
-    * gp.quicksum(
-        socs_fin_n[n, s] + socs_fin_p[n, s]
-        for n in range(scenario_tree.n_nodes_per_stage[params.n_stages - 1])
-        for s in range(params.n_storages)
-    )
 )
 
-obj = obj_gen + obj_stge
-
-print(obj_stge)
+obj = obj_gen + penalty_gen + penalty_stge
 
 model.setObjective(obj)
 
@@ -261,9 +247,12 @@ for t in range(1, params.n_stages):
 # t=T
 t = params.n_stages - 1
 model.addConstrs(
-    soc[t, n.index, s] == soc_init[s] + socs_fin_p[n.index, s] - socs_fin_n[n.index, s]
-    for s in range(params.n_storages)
-    for n in scenario_tree.get_stage_nodes(t)
+    (
+        soc[t, n.index, s] >= soc_init[s] - delta[t, n.index]
+        for s in range(params.n_storages)
+        for n in scenario_tree.get_stage_nodes(t)
+    ),
+    "soc-final",
 )
 
 # Power flow constraints
@@ -462,19 +451,35 @@ model.optimize()
 # model.computeIIS()
 # model.write("model.ilp")
 # model.display()
+# model.printAttr("X")
 
 runtime_logger.log_task_end("model_solving", model_solving_start_time)
 
-slack_variables = [ys_p, ys_n, socs_p, socs_n, socs_fin_n, socs_fin_p, delta]
+slack_variables = [ys_p, ys_n, socs_p, socs_n, delta]
 total_slack = 0
 for variable in slack_variables:
     total_slack += sum([slack.x for _, slack in variable.items()])
 
-print(sum([slack.x for _, slack in delta.items()]))
-print(sum([slack.x for _, slack in socs_fin_n.items()]))
-print(sum([slack.x for _, slack in socs_fin_p.items()]))
-print(sum([slack.x for _, slack in socs_p.items()]))
-print(sum([slack.x for _, slack in socs_n.items()]))
+# print(sum([slack.x for _, slack in delta.items()]))
+# print(sum([slack.x for _, slack in socs_p.items()]))
+# print(sum([slack.x for _, slack in socs_n.items()]))
+
+# print("Charge")
+# print(ys_charge[0, 0, 0].x)
+# print(ys_charge[1, 0, 0].x)
+# print(ys_charge[1, 1, 0].x)
+# print(ys_charge[1, 2, 0].x)
+# print("Discharge")
+# print(ys_discharge[0, 0, 0].x)
+# print(ys_discharge[1, 0, 0].x)
+# print(ys_discharge[1, 1, 0].x)
+# print(ys_discharge[1, 2, 0].x)
+# print("SOC")
+# print(soc[0, 0, 0].x)
+# print(soc[1, 0, 0].x)
+# print(soc[1, 1, 0].x)
+# print(soc[1, 2, 0].x)
+
 
 print("Solving finished.")
 print(f"Optimal value: {obj.getValue()}")

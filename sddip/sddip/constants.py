@@ -26,3 +26,7 @@ class ResultKeys:
     bc_gradient_key = "gradient"
     bc_trial_point_key = "trial_point"
     benders_cut_keys = [bc_intercept_key, bc_gradient_key, bc_trial_point_key]
+
+    ds_iterations = "iterations"
+    ds_solver_time = "solver_time"
+    dual_solver_keys = [ds_iterations, ds_solver_time]

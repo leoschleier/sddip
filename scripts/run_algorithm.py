@@ -2,13 +2,15 @@ from sddip import algorithm, logger, storage
 
 
 # Parameters
-test_case = "case6ww"
-n_iterations = 15
+test_case = "WB5"
+n_iterations = 5
+time_limit_minutes = 3 * 60
+stabilization_count = 10
 init_n_binaries = 5
 init_n_samples = 1
-init_cut_mode = "sb"
+init_cut_mode = "l"
 n_samples_leap = 0
-big_m = 10 ** 3
+big_m = 10 ** 5
 sos = False
 
 
@@ -25,6 +27,8 @@ if init_n_samples:
     algo.n_samples = init_n_samples
 algo.n_samples_leap = n_samples_leap
 algo.sos = sos
+algo.time_limit_minutes = time_limit_minutes
+algo.stabilization_count = stabilization_count
 
 try:
     algo.run(n_iterations)

@@ -1,4 +1,5 @@
 from abc import ABC
+import random
 import gurobipy as gp
 import numpy as np
 from time import time
@@ -38,6 +39,7 @@ class DualSolver(ABC):
         )
 
         model.setObjective(total_objective)
+
         model.update()
 
         solver_start_time = time()
@@ -283,8 +285,10 @@ class BundleMethod(DualSolver):
     def __init__(self, max_iterations: int, tolerance: float, log_dir: str):
         super().__init__(max_iterations, tolerance, log_dir, self.TAG)
 
-        self.penalty_factor = 1
-        self.alpha = 0.5
+        self.u_init = 1
+        self.u_min = 0.1
+        self.m_l = 0.3
+        self.m_r = 0.7
 
     def solve(self, model: gp.Model, objective_terms, relaxed_terms):
         model.setParam("OutputFlag", 0)
@@ -294,63 +298,79 @@ class BundleMethod(DualSolver):
         self.log_task_start()
 
         tolerance_reached = False
+        u = self.u_init
+        i_u = 0
+        var_est = 10 ** 8
+
         gradient_len = len(relaxed_terms)
-        dual_multipliers = np.zeros(gradient_len)
-        dual_multipliers_best = np.zeros(gradient_len)
+        x_new = np.zeros(gradient_len)
+        x_best = np.zeros(gradient_len)
 
         # Initial subgradient and best lower bound
-        subgradient, opt_value_best = self.get_subgradient_and_value(
-            model, objective_terms, relaxed_terms, dual_multipliers_best
+        subgradient, f_best = self.get_subgradient_and_value(
+            model, objective_terms, relaxed_terms, x_best
         )
 
-        opt_value = opt_value_best
+        f_new = f_best
 
         # Lowest known gradient magnitude
         lowest_gm = np.linalg.norm(np.array(subgradient))
 
         # Subproblem with cutting planes
-        subproblem, epi, dm = self.create_subproblem(gradient_len)
+        subproblem, v, x = self.create_subproblem(gradient_len)
 
         for i in range(self.max_iterations):
 
             # Add new plane to subproblem
-            new_plane = opt_value + gp.quicksum(
-                subgradient[j] * (dm[j] - dual_multipliers[j])
-                for j in range(gradient_len)
+            new_plane = f_new + gp.quicksum(
+                subgradient[j] * (x[j] - x_new[j]) for j in range(gradient_len)
             )
 
-            obj = epi - self.penalty_factor / 2 * gp.quicksum(
-                (dm[j] - dual_multipliers_best[j]) ** 2 for j in range(gradient_len)
+            obj = v - u / 2 * gp.quicksum(
+                (x[j] - x_best[j]) ** 2 for j in range(gradient_len)
             )
             subproblem.setObjective(obj, gp.GRB.MAXIMIZE)
-
-            subproblem.addConstr(epi <= new_plane, name=f"{i+1}")
+            subproblem.addConstr(v <= new_plane, name=f"{i+1}")
             subproblem.update()
 
             # Solve subproblem
             subproblem.optimize()
 
             # Candidate dual multipliers
-            dual_multipliers = [dm[j].x for j in range(gradient_len)]
-
-            # Calculate error
-            delta = max(0, subproblem.getObjective().getValue() - opt_value_best)
+            x_new = [x[j].x for j in range(gradient_len)]
 
             # Candidate optimal value
-            subgradient, opt_value = self.get_subgradient_and_value(
-                model, objective_terms, relaxed_terms, dual_multipliers
+            subgradient, f_new = self.get_subgradient_and_value(
+                model, objective_terms, relaxed_terms, x_new
             )
 
-            # Update lowest known gradient magnitude
+            # Predicted ascent
+            delta = max(v.x - f_best, 0)
+
+            # Update lowest known gradient magnitude for logging purposes
             lowest_gm = min(lowest_gm, np.linalg.norm(np.array(subgradient)))
 
-            # Serious step
-            if opt_value - opt_value_best >= self.alpha * delta:
-                dual_multipliers_best = copy.copy(dual_multipliers)
-                opt_value_best = copy.copy(opt_value)
+            serious_step = f_new - f_best >= self.m_l * delta
+            # Weight update
+            # u, i_u, var_est = self.weight_update(
+            #     u,
+            #     i_u,
+            #     var_est,
+            #     x_new,
+            #     f_new,
+            #     x_best,
+            #     f_best,
+            #     v.x,
+            #     subgradient,
+            #     serious_step,
+            # )
+            if serious_step:
+                # Serious step
+                x_best = copy.copy(x_new)
+                f_best = copy.copy(f_new)
 
             # Check stopping criterion
-            if delta < self.tolerance:
+            if delta <= self.tolerance:
                 tolerance_reached = True
                 break
 
@@ -358,24 +378,71 @@ class BundleMethod(DualSolver):
 
         self.log_task_end()
 
-        self.print_method_finished(stop_reason, i + 1, lowest_gm, opt_value_best)
+        self.print_method_finished(stop_reason, i + 1, lowest_gm, f_best)
 
-        self.results.set_values(
-            opt_value_best, np.array(dual_multipliers_best), i + 1, self.solver_time
-        )
+        self.results.set_values(f_best, np.array(x_best), i + 1, self.solver_time)
 
         return (model, self.results)
+
+    def weight_update(
+        self,
+        u_current,
+        i_u,
+        var_est,
+        x_new,
+        f_new,
+        x_best,
+        f_best,
+        f_hat,
+        subgradient,
+        serious_step,
+    ):
+        variation_estimate = var_est
+
+        delta = f_hat - f_best
+        u_int = 2 * u_current * (1 - (f_new - f_best) / delta)
+        u = u_current
+        # print(f"f: {f_new - f_best}")
+        if serious_step:
+            weight_too_large = (f_new - f_best) >= (self.m_r * delta)
+            if weight_too_large and i_u > 0:
+                u = u_int
+            elif i_u > 3:
+                u = u_current / 2
+            u_new = max(u, u_current / 10, self.u_min)
+            # print(f"u: {u}, {u_current/10}, {self.u_min}")
+            variation_estimate = max(variation_estimate, 2 * delta)
+            i_u = max(i_u + 1, 1) if u_new == u_current else 1
+            # Exit
+        else:
+            # print("Null")
+            p = -u_current * (np.array(x_new) - np.array(x_best))
+            alpha = delta - np.linalg.norm(p, ord=2) ** 2 / u_current
+            variation_estimate = min(
+                variation_estimate, np.linalg.norm(p, ord=1) + alpha
+            )
+            # x_best x_new Reihenfolge ?
+            linearization_error = (
+                f_new
+                + np.array(subgradient).dot(np.array(x_best) - np.array(x_new))
+                - f_best
+            )
+            if linearization_error > max(variation_estimate, 10 * delta) and i_u < -3:
+                u = u_int
+            u_new = min(u, 10 * u_current)
+            i_u = min(i_u - 1, -1) if u_new == u_current else -1
+            # Exit
+
+        return u_new, i_u, variation_estimate
 
     def create_subproblem(self, n_dual_multipliers: int):
         subproblem = gp.Model("Subproblem")
         subproblem.setParam("OutputFlag", 0)
-        epi = subproblem.addVar(
-            vtype=gp.GRB.CONTINUOUS, lb=-gp.GRB.INFINITY, name="epi"
+        v = subproblem.addVar(vtype=gp.GRB.CONTINUOUS, lb=-gp.GRB.INFINITY, name="v")
+        x = subproblem.addVars(
+            n_dual_multipliers, vtype=gp.GRB.CONTINUOUS, lb=-gp.GRB.INFINITY, name="x"
         )
-        dm = subproblem.addVars(
-            n_dual_multipliers, vtype=gp.GRB.CONTINUOUS, lb=-gp.GRB.INFINITY, name="dm"
-        )
-        return subproblem, epi, dm
+        return subproblem, v, x
 
 
 class SolverResults:

@@ -1,4 +1,5 @@
 import os
+from typing import Set
 import numpy as np
 import pandas as pd
 import gurobipy as gp
@@ -30,16 +31,19 @@ class SddipAlgorithm:
         self.problem_params = parameters.Parameters(test_case)
 
         # Algorithm paramters
-        self.max_n_samples = min(30, self.problem_params.n_scenarios)
+        self.max_n_samples = 3
         self.n_samples = self.max_n_samples
         self.n_samples_leap = 0
         self.n_binaries = 10
         self.error_threshold = 10 ** (-1)
         self.max_n_binaries = 10
-        # Relative change in lower bound
-        self.refinement_tolerance = 10 ** (-2)
+        # Absolute change in lower bound
+        self.refinement_tolerance = 10 ** (-6)
+        self.no_improvement_tolerance = 10 ** (-6)
+        self.stabilization_count = 2
         self.big_m = 10 ** 6
         self.sos = False
+        self.time_limit_minutes = 5 * 60
 
         # Helper objects
         self.binarizer = utils.Binarizer()
@@ -48,7 +52,7 @@ class SddipAlgorithm:
             self.problem_params.n_realizations_per_stage[1],
         )
 
-        ds_max_iterations = 500
+        ds_max_iterations = 5000
 
         if method == "sg":
             self.dual_solver = dualsolver.SubgradientMethod(
@@ -63,6 +67,7 @@ class SddipAlgorithm:
 
         self.init_cut_mode = cut_mode
         self.cut_mode = self.init_cut_mode
+        self.cut_types_added = set()
 
         self.dual_solver.log_flag = False
 
@@ -103,8 +108,21 @@ class SddipAlgorithm:
         self.runtime_logger.start()
         self.dual_solver.runtime_logger.start()
         lower_bounds = []
+        no_improvement_counter = 0
+        last_lagrangian_cut_iteration = 1
         for i in range(n_iterations):
             print(f"Iteration {i+1}")
+
+            ########################################
+            # Binary approximation refinement
+            ########################################
+            refinement_start_time = time()
+            self.binary_approximation_refinement(i, lower_bounds)
+            if not self.init_cut_mode == "l":
+                self.select_cut_mode(i, lower_bounds)
+            self.runtime_logger.log_task_end(
+                f"binary_approximation_refinement_i{i+1}", refinement_start_time
+            )
 
             ########################################
             # Sampling
@@ -135,22 +153,15 @@ class SddipAlgorithm:
             )
 
             ########################################
-            # Binary approximation refinement
-            ########################################
-            refinement_start_time = time()
-            self.binary_approximation_refinement(i, lower_bounds)
-            self.runtime_logger.log_task_end(
-                f"binary_approximation_refinement_i{i+1}", refinement_start_time
-            )
-
-            ########################################
             # Backward pass
             ########################################
             backward_pass_start_time = time()
             if self.cut_mode == "l":
                 self.backward_pass(i + 1, samples)
+                self.cut_types_added.update(["l"])
             elif self.cut_mode in ["b", "sb"]:
                 self.backward_benders(i + 1, samples)
+                self.cut_types_added.update(["b", "sb"])
             self.runtime_logger.log_task_end(
                 f"backward_pass_i{i+1}", backward_pass_start_time
             )
@@ -175,6 +186,31 @@ class SddipAlgorithm:
             # Increase number of samples
             if self.n_samples < self.max_n_samples:
                 self.n_samples += self.n_samples_leap
+
+            # Check improvement
+            no_improvement_by_consecutive_cuts = False
+            if self.cut_mode == "l" and i > 0:
+                no_improvement_by_consecutive_cuts = (
+                    lower_bounds[-1] - lower_bounds[last_lagrangian_cut_iteration - 1]
+                    < self.no_improvement_tolerance
+                )
+                last_lagrangian_cut_iteration = i
+            ########################################
+            # Stopping criteria
+            ########################################
+            # Stop if time limit reached
+            if (
+                time() - self.runtime_logger.global_start_time
+                >= self.time_limit_minutes * 60
+            ):
+                break
+            # Stop if lower bound stagnates
+            if no_improvement_by_consecutive_cuts:
+                no_improvement_counter += 1
+                if no_improvement_counter >= self.stabilization_count:
+                    break
+            else:
+                no_improvement_counter = 0
 
         self.runtime_logger.log_experiment_end()
         self.dual_solver.runtime_logger.log_experiment_end()
@@ -223,10 +259,7 @@ class SddipAlgorithm:
                 uc_fw: ucmodel.ForwardModelBuilder = self.add_problem_constraints(
                     uc_fw, t, n, i
                 )
-                # print(f"x: {x_trial_point}")
-                # print(f"y: {y_trial_point}")
-                # print(f"xbs: {x_bs_trial_point}")
-                # print(f"soc: {soc_trial_point}")
+
                 uc_fw.add_copy_constraints(
                     x_trial_point, y_trial_point, x_bs_trial_point, soc_trial_point,
                 )
@@ -234,40 +267,30 @@ class SddipAlgorithm:
                 # Solve problem
                 uc_fw.disable_output()
                 uc_fw.model.optimize()
-                # if i == 5:
-                #     print(f"{t}, {n}")
-                #     uc_fw.enable_output()
-                #     uc_fw.model.printAttr("X")
 
-                x_kt = [x_g.x for x_g in uc_fw.x]
-                y_kt = [y_g.x for y_g in uc_fw.y]
-                x_bs_kt = [[x_bs.x for x_bs in x_bs_g] for x_bs_g in uc_fw.x_bs]
-                soc_kt = [soc_s.x for soc_s in uc_fw.soc]
-
-                # if t == 0:
-                # print(f"{t}, {n}")
-                # yc = [c.x for c in uc_fw.ys_c]
-                # ydc = [dc.x for dc in uc_fw.ys_dc]
-                #     print(f"soc-trial: {soc_trial_point}")
-                #     print(f"soc: {soc_kt}")
-                # print(f"yc: {yc}")
-                # print(f"ydc: {ydc}")
-                #     print(f"ysp: {uc_fw.ys_p.x}")
-                #     print(f"ysn:{uc_fw.ys_n.x}")
+                try:
+                    x_kt = [x_g.x for x_g in uc_fw.x]
+                    y_kt = [y_g.x for y_g in uc_fw.y]
+                    x_bs_kt = [[x_bs.x for x_bs in x_bs_g] for x_bs_g in uc_fw.x_bs]
+                    soc_kt = [soc_s.x for soc_s in uc_fw.soc]
+                except AttributeError:
+                    uc_fw.model.write("model.lp")
+                    uc_fw.model.computeIIS()
+                    uc_fw.model.write("model.ilp")
+                    raise
 
                 # Value of stage t objective function
                 v_value_function = uc_fw.model.getObjective().getValue()
                 v_opt_kt = v_value_function - uc_fw.theta.x
                 v_opt_k[-1] += v_opt_kt
-                # print(f"Forward {t},{n}: {uc_fw.ys_p.x}")
-                # New trial point
-                # TODO trial point contains x and y
+
                 x_trial_point = x_kt
                 y_trial_point = y_kt
-                x_bs_trial_point = [
-                    [x_trial_point[g]] + x_bs_kt[g][:-1]
-                    for g in range(self.problem_params.n_gens)
-                ]
+                if any(x_bs_kt):
+                    x_bs_trial_point = [
+                        [x_trial_point[g]] + x_bs_kt[g][:-1]
+                        for g in range(self.problem_params.n_gens)
+                    ]
                 soc_trial_point = soc_kt
 
                 ps_dict = self.ps_storage.create_empty_result_dict()
@@ -292,24 +315,18 @@ class SddipAlgorithm:
         return v_upper_l, v_uppper_r
 
     def binary_approximation_refinement(self, iteration: int, lower_bounds: list):
-        # Check if forward pass solution i equals that in i-1
-        upper_bounds = self.problem_params.pg_max + self.problem_params.soc_max
-
-        # errors_below_threshold = all(
-        #     v <= self.error_threshold for v in continuous_variables_approx_error
-        # )
-
         # Check if refinment condition holds
         refinement_condition = False
-        if not (iteration <= 1 or self.n_binaries >= self.max_n_binaries):
-            delta = abs((lower_bounds[-1] - lower_bounds[-2]) / lower_bounds[-2])
+
+        if iteration > 1:
+            delta = max((lower_bounds[-1] - lower_bounds[-2]), 0)
             refinement_condition = delta <= self.refinement_tolerance
 
-        if refinement_condition:
-            if self.cut_mode == "l":
-                print("Refinement performed.")
-                self.n_binaries += 1
-            self.cut_mode = "l"
+        if refinement_condition and self.cut_mode == "l":
+            print("Refinement performed.")
+            self.n_binaries += 1 if self.n_binaries < self.max_n_binaries else 0
+
+        upper_bounds = self.problem_params.pg_max + self.problem_params.soc_max
 
         continuous_variables_precision = [
             self.binarizer.calc_precision_from_n_binaries(ub, self.n_binaries)
@@ -320,6 +337,20 @@ class SddipAlgorithm:
             for prec in continuous_variables_precision
         ]
         print(f"Approximation errors: {continuous_variables_approx_error}")
+
+    def select_cut_mode(self, iteration: int, lower_bounds: list):
+        no_improvement_condition = False
+
+        if iteration > 1:
+            delta = max((lower_bounds[-1] - lower_bounds[-2]), 0)
+            no_improvement_condition = delta <= self.no_improvement_tolerance
+
+        if self.cut_mode == "l":
+            self.cut_mode = "sb"
+            self.n_samples = self.max_n_samples
+        elif no_improvement_condition:
+            self.cut_mode = "l"
+            self.n_samples = 1
 
     def backward_pass(self, iteration: int, samples: list):
         i = iteration
@@ -490,7 +521,6 @@ class SddipAlgorithm:
                     + [val for bs in x_bs_trial_point for val in bs]
                     + soc_trial_point
                 )
-                print(f"TP: {trial_point}")
 
                 dual_multipliers = []
                 opt_values = []
@@ -517,9 +547,6 @@ class SddipAlgorithm:
                     )
 
                     uc_fw.model.optimize()
-                    # if i == 1 and t == 1 and k == 0 and n == 0:
-                    #     uc_fw.enable_output()
-                    #     uc_fw.model.display()
 
                     copy_constrs = [
                         uc_fw.copy_constraints_x,
@@ -534,7 +561,7 @@ class SddipAlgorithm:
                             constr.getAttr(gp.GRB.attr.Pi)
                             for _, constr in constr_set.items()
                         ]
-                    # print(dm)
+
                     dual_multipliers.append(dm)
 
                     if self.cut_mode == "b":
@@ -564,9 +591,6 @@ class SddipAlgorithm:
                             uc_fw.model, uc_fw.objective_terms, copy_terms, dm
                         )
                         opt_values.append(dual_value)
-
-                # print(f"DM: {dual_multipliers}")
-                # print(f"V: {opt_values}")
 
                 opt_values = np.array(opt_values)
                 dual_multipliers = np.array(dual_multipliers)
@@ -611,6 +635,10 @@ class SddipAlgorithm:
         # Solve problem
         uc_fw.disable_output()
         uc_fw.model.optimize()
+
+        # if i == 7:
+        #     uc_fw.enable_output()
+        #     uc_fw.model.display()
 
         # Value of stage t objective function
         v_lower = uc_fw.model.getObjective().getValue()
@@ -673,7 +701,7 @@ class SddipAlgorithm:
         model_builder.add_cut_lower_bound(self.problem_params.cut_lb[stage])
 
         if stage < self.problem_params.n_stages - 1 and iteration > 0:
-            if self.cut_mode == "l":
+            if "l" in self.cut_types_added:
                 cut_coefficients = self.cc_storage.get_stage_result(stage)
                 model_builder.add_cut_constraints(
                     cut_coefficients[ResultKeys.ci_key],
@@ -683,7 +711,7 @@ class SddipAlgorithm:
                     self.big_m,
                     self.sos,
                 )
-            if self.init_cut_mode in ["b", "sb"]:
+            if bool(self.cut_types_added & {"b", "sb"}):
                 benders_coefficients = self.bc_storage.get_stage_result(stage)
                 model_builder.add_benders_cuts(
                     benders_coefficients[ResultKeys.bc_intercept_key],

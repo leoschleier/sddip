@@ -72,16 +72,18 @@ class ModelBuilder(ABC):
         # Cut lower bound
         self.cut_lower_bound = None
 
-        self.initialize_variables(lp_relax)
+        self.bin_type = gp.GRB.CONTINUOUS if lp_relax else gp.GRB.BINARY
+
+        self.initialize_variables()
         self.initialize_copy_variables()
 
-    def initialize_variables(self, lp_relax: bool):
-
-        bin_type = gp.GRB.CONTINUOUS if lp_relax else gp.GRB.BINARY
+    def initialize_variables(self):
 
         for g in range(self.n_generators):
             self.x.append(
-                self.model.addVar(vtype=bin_type, lb=0, ub=1, name="x_%i" % (g + 1))
+                self.model.addVar(
+                    vtype=self.bin_type, lb=0, ub=1, name="x_%i" % (g + 1)
+                )
             )
             self.y.append(
                 self.model.addVar(vtype=gp.GRB.CONTINUOUS, lb=0, name="y_%i" % (g + 1))
@@ -89,17 +91,22 @@ class ModelBuilder(ABC):
             self.x_bs.append(
                 [
                     self.model.addVar(
-                        vtype=bin_type, lb=0, ub=1, name="x_bs_%i_%i" % (g + 1, k + 1),
+                        vtype=self.bin_type,
+                        lb=0,
+                        ub=1,
+                        name="x_bs_%i_%i" % (g + 1, k + 1),
                     )
                     for k in range(self.backsight_periods[g])
                 ]
             )
             self.s_up.append(
-                self.model.addVar(vtype=bin_type, lb=0, ub=1, name="s_up_%i" % (g + 1))
+                self.model.addVar(
+                    vtype=self.bin_type, lb=0, ub=1, name="s_up_%i" % (g + 1)
+                )
             )
             self.s_down.append(
                 self.model.addVar(
-                    vtype=bin_type, lb=0, ub=1, name="s_down_%i" % (g + 1)
+                    vtype=self.bin_type, lb=0, ub=1, name="s_down_%i" % (g + 1)
                 )
             )
         for s in range(self.n_storages):
@@ -110,7 +117,7 @@ class ModelBuilder(ABC):
                 self.model.addVar(vtype=gp.GRB.CONTINUOUS, lb=0, name=f"y_dc_{s+1}")
             )
             self.u_c_dc.append(
-                self.model.addVar(vtype=bin_type, lb=0, ub=1, name=f"u_{s+1}")
+                self.model.addVar(vtype=self.bin_type, lb=0, ub=1, name=f"u_{s+1}")
             )
             self.soc.append(
                 self.model.addVar(vtype=gp.GRB.CONTINUOUS, lb=0, name=f"soc_{s+1}")
@@ -135,36 +142,22 @@ class ModelBuilder(ABC):
     def initialize_copy_variables(self):
         for g in range(self.n_generators):
             self.z_x.append(
-                self.model.addVar(
-                    vtype=gp.GRB.CONTINUOUS,
-                    lb=-gp.GRB.INFINITY,
-                    name="z_x_%i" % (g + 1),
-                )
+                self.model.addVar(vtype=gp.GRB.CONTINUOUS, name="z_x_%i" % (g + 1),)
             )
             self.z_y.append(
-                self.model.addVar(
-                    vtype=gp.GRB.CONTINUOUS,
-                    lb=-gp.GRB.INFINITY,
-                    name="z_y_%i" % (g + 1),
-                )
+                self.model.addVar(vtype=gp.GRB.CONTINUOUS, name="z_y_%i" % (g + 1),)
             )
             self.z_x_bs.append(
                 [
                     self.model.addVar(
-                        vtype=gp.GRB.CONTINUOUS,
-                        lb=-gp.GRB.INFINITY,
-                        name="z_x_bs_%i_%i" % (g + 1, k + 1),
+                        vtype=gp.GRB.CONTINUOUS, name="z_x_bs_%i_%i" % (g + 1, k + 1),
                     )
                     for k in range(self.backsight_periods[g])
                 ]
             )
         for s in range(self.n_storages):
             self.z_soc.append(
-                self.model.addVar(
-                    vtype=gp.GRB.CONTINUOUS,
-                    lb=-gp.GRB.INFINITY,
-                    name="z_soc_%i" % (s + 1),
-                )
+                self.model.addVar(vtype=gp.GRB.CONTINUOUS, name="z_soc_%i" % (s + 1),)
             )
         self.model.update()
 
@@ -411,7 +404,10 @@ class ModelBuilder(ABC):
         n_state_variables = len(state_variables)
 
         if not n_state_variables == len(trial_point):
-            raise ValueError("asdf")
+            print(trial_point)
+            raise ValueError(
+                "Number of state variables must be equal to the number of trial points."
+            )
         # print(cut_gradient)
 
         self.model.addConstr(
@@ -461,11 +457,17 @@ class ModelBuilder(ABC):
         x_bs_binary_multipliers = linalg.block_diag(*[1] * n_total_backsight_variables)
 
         binary_multipliers = linalg.block_diag(
-            x_binary_multipliers,
-            y_binary_multipliers,
-            x_bs_binary_multipliers,
-            soc_binary_multipliers,
+            x_binary_multipliers, y_binary_multipliers
         )
+
+        if x_bs_binary_multipliers.size > 0:
+            binary_multipliers = linalg.block_diag(
+                binary_multipliers, x_bs_binary_multipliers
+            )
+        if soc_binary_multipliers.size > 0:
+            binary_multipliers = linalg.block_diag(
+                binary_multipliers, soc_binary_multipliers
+            )
 
         n_var_approximations, n_binaries = binary_multipliers.shape
 
@@ -492,8 +494,8 @@ class ModelBuilder(ABC):
             + self.soc
         )
 
-        w = self.model.addVars(n_binaries, vtype=gp.GRB.BINARY, name=f"w_{id}")
-        u = self.model.addVars(n_binaries, vtype=gp.GRB.BINARY, name=f"u_{id}")
+        w = self.model.addVars(n_binaries, vtype=self.bin_type, name=f"w_{id}")
+        u = self.model.addVars(n_binaries, vtype=self.bin_type, name=f"u_{id}")
 
         # TODO Define Big-Ms
         m2 = [big_m] * n_binaries
@@ -797,7 +799,13 @@ class BackwardModelBuilder(ModelBuilder):
         self.check_bin_copy_vars_not_empty()
 
         n_y_var_approximations, n_y_binaries = y_binary_trial_multipliers.shape
-        n_soc_var_approximations, n_soc_binaries = soc_binary_trial_multipliers.shape
+        n_soc_var_approximations = 0
+        n_soc_binaries = 0
+        if soc_binary_trial_multipliers.size > 0:
+            (
+                n_soc_var_approximations,
+                n_soc_binaries,
+            ) = soc_binary_trial_multipliers.shape
 
         self.copy_constraints_y = self.model.addConstrs(
             (

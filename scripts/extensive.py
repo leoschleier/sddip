@@ -2,7 +2,7 @@ import gurobipy as gp
 from time import time
 from sddip import parameters, tree, logger
 
-test_case_name = "case6ww"
+test_case_name = "WB5"
 
 log_manager = logger.LogManager()
 log_dir = log_manager.create_log_dir(f"{test_case_name}_ext")
@@ -442,7 +442,7 @@ runtime_logger.log_task_end(f"model_building", model_building_start_time)
 # Solving procedure
 ########################################################################################################################
 model.setParam("OutputFlag", 0)
-model.setParam("TimeLimit", 5 * 60 * 60)
+model.setParam("TimeLimit", 3 * 60 * 60)
 
 print("Solving process started...")
 model_solving_start_time = time()

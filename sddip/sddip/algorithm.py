@@ -38,9 +38,10 @@ class SddipAlgorithm:
         self.error_threshold = 10 ** (-1)
         self.max_n_binaries = 10
         # Absolute change in lower bound
-        self.refinement_tolerance = 10 ** (-6)
-        self.no_improvement_tolerance = 10 ** (-6)
-        self.stabilization_count = 2
+        self.refinement_tolerance = 10 ** (-8)
+        self.no_improvement_tolerance = 10 ** (-8)
+        self.stop_stabilization_count = 5
+        self.refinement_stabilization_count = 2
         self.big_m = 10 ** 6
         self.sos = False
         self.time_limit_minutes = 5 * 60
@@ -90,26 +91,12 @@ class SddipAlgorithm:
 
         self.bound_storage = storage.ResultStorage(ResultKeys.bound_keys, "bounds")
 
-        # Initialization
-        # self.init_binary_multipliers(self.init_n_binaries)
-
-    def init_binary_multipliers(self, n_binaries: int):
-        self.y_bin_multipliers = [
-            self.binarizer.calc_binary_multipliers_from_n_binaries(ub, n_binaries)
-            for ub in self.problem_params.pg_max
-        ]
-        self.soc_bin_multipliers = [
-            self.binarizer.calc_binary_multipliers_from_n_binaries(ub, n_binaries)
-            for ub in self.problem_params.soc_max
-        ]
-
     def run(self, n_iterations: int):
         print("#### SDDiP-Algorithm started ####")
         self.runtime_logger.start()
         self.dual_solver.runtime_logger.start()
         lower_bounds = []
-        no_improvement_counter = 0
-        last_lagrangian_cut_iteration = 1
+        lagrangian_cut_iterations = []
         for i in range(n_iterations):
             print(f"Iteration {i+1}")
 
@@ -117,7 +104,9 @@ class SddipAlgorithm:
             # Binary approximation refinement
             ########################################
             refinement_start_time = time()
-            self.binary_approximation_refinement(i, lower_bounds)
+            self.binary_approximation_refinement(
+                i, lower_bounds, lagrangian_cut_iterations
+            )
             if not self.init_cut_mode == "l":
                 self.select_cut_mode(i, lower_bounds)
             self.runtime_logger.log_task_end(
@@ -157,6 +146,7 @@ class SddipAlgorithm:
             ########################################
             backward_pass_start_time = time()
             if self.cut_mode == "l":
+                lagrangian_cut_iterations.append(i)
                 self.backward_pass(i + 1, samples)
                 self.cut_types_added.update(["l"])
             elif self.cut_mode in ["b", "sb"]:
@@ -184,17 +174,10 @@ class SddipAlgorithm:
             self.bound_storage.add_result(i, 0, 0, bound_dict)
 
             # Increase number of samples
+            # TODO Deprecated
             if self.n_samples < self.max_n_samples:
                 self.n_samples += self.n_samples_leap
 
-            # Check improvement
-            no_improvement_by_consecutive_cuts = False
-            if self.cut_mode == "l" and i > 0:
-                no_improvement_by_consecutive_cuts = (
-                    lower_bounds[-1] - lower_bounds[last_lagrangian_cut_iteration - 1]
-                    < self.no_improvement_tolerance
-                )
-                last_lagrangian_cut_iteration = i
             ########################################
             # Stopping criteria
             ########################################
@@ -205,12 +188,19 @@ class SddipAlgorithm:
             ):
                 break
             # Stop if lower bound stagnates
-            if no_improvement_by_consecutive_cuts:
-                no_improvement_counter += 1
-                if no_improvement_counter >= self.stabilization_count:
-                    break
-            else:
-                no_improvement_counter = 0
+            stagnation = False
+            if (
+                len(lagrangian_cut_iterations) >= (self.stop_stabilization_count + 1)
+                and i > 0
+            ):
+                stagnation = (
+                    lower_bounds[-1]
+                    - lower_bounds[-(self.stop_stabilization_count + 1)]
+                    < self.no_improvement_tolerance
+                )
+            if stagnation:
+                print("Lower bound stabilized.")
+                break
 
         self.runtime_logger.log_experiment_end()
         self.dual_solver.runtime_logger.log_experiment_end()
@@ -314,12 +304,24 @@ class SddipAlgorithm:
 
         return v_upper_l, v_uppper_r
 
-    def binary_approximation_refinement(self, iteration: int, lower_bounds: list):
-        # Check if refinment condition holds
+    def binary_approximation_refinement(
+        self, iteration: int, lower_bounds: list, lagrangian_cut_iterations: list
+    ):
+        # Check if refinment condition is true
         refinement_condition = False
 
-        if iteration > 1:
-            delta = max((lower_bounds[-1] - lower_bounds[-2]), 0)
+        if (
+            len(lagrangian_cut_iterations) >= (self.refinement_stabilization_count + 1)
+            and iteration > 1
+        ):
+            delta = (
+                lower_bounds[-1]
+                - lower_bounds[
+                    lagrangian_cut_iterations[
+                        -(self.refinement_stabilization_count + 1)
+                    ]
+                ]
+            )
             refinement_condition = delta <= self.refinement_tolerance
 
         if refinement_condition and self.cut_mode == "l":
@@ -556,11 +558,17 @@ class SddipAlgorithm:
                     ]
 
                     dm = []
-                    for constr_set in copy_constrs:
-                        dm += [
-                            constr.getAttr(gp.GRB.attr.Pi)
-                            for _, constr in constr_set.items()
-                        ]
+                    try:
+                        for constr_set in copy_constrs:
+                            dm += [
+                                constr.getAttr(gp.GRB.attr.Pi)
+                                for _, constr in constr_set.items()
+                            ]
+                    except AttributeError:
+                        uc_fw.model.write("model.lp")
+                        uc_fw.model.computeIIS()
+                        uc_fw.model.write("model.ilp")
+                        raise
 
                     dual_multipliers.append(dm)
 
@@ -635,10 +643,6 @@ class SddipAlgorithm:
         # Solve problem
         uc_fw.disable_output()
         uc_fw.model.optimize()
-
-        # if i == 7:
-        #     uc_fw.enable_output()
-        #     uc_fw.model.display()
 
         # Value of stage t objective function
         v_lower = uc_fw.model.getObjective().getValue()

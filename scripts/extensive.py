@@ -2,7 +2,7 @@ import gurobipy as gp
 from time import time
 from sddip import parameters, tree, logger
 
-test_case_name = "WB5"
+test_case_name = "case6ww"
 
 log_manager = logger.LogManager()
 log_dir = log_manager.create_log_dir(f"{test_case_name}_ext")
@@ -393,7 +393,7 @@ for g in range(params.n_gens):
             model.addConstr(
                 (
                     gp.quicksum(x[m.stage, m.index, g] for m in ancestors)
-                    >= (t + 1) * s_down[t, n, g] - delta[t, n]
+                    >= t * s_down[t, n, g] - delta[t, n]
                 ),
                 "min-uptime",
             )
@@ -417,7 +417,7 @@ for g in range(params.n_gens):
             model.addConstr(
                 (
                     gp.quicksum((1 - x[m.stage, m.index, g]) for m in ancestors)
-                    >= (t + 1) * s_up[t, n, g] - delta[t, n]
+                    >= t * s_up[t, n, g] - delta[t, n]
                 ),
                 "min-downtime",
             )

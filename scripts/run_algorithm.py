@@ -2,16 +2,33 @@ from sddip import algorithm, logger, storage
 
 
 # Parameters
-test_case = "WB5"
-n_iterations = 5
+test_case = "case6ww"
+
+n_iterations = 50
 time_limit_minutes = 3 * 60
-stabilization_count = 10
+
+# Number of iterations after an unchanging
+# lower bound is considered stabilized
+stop_stabilization_count = 50
+refinement_stabilization_count = 1
+
 init_n_binaries = 5
-init_n_samples = 1
-init_cut_mode = "l"
+
+# Gradual increase in number of samples
 n_samples_leap = 0
-big_m = 10 ** 5
+
+# Starting cut mode
+# b: Bender's cuts
+# sb: Strengthened Benders' cuts
+# l: Lagrangian cuts
+# If starting cut mode is 'l', then it will not be changed throughout the algorithm
+init_cut_mode = "sb"
+init_n_samples = 3
+
+# Note: Sos-constraint in the cut projection cannot be used
+# in combination with Benders cuts due to the LP relaxation
 sos = False
+big_m = 10 ** 5
 
 
 # Logger
@@ -28,7 +45,8 @@ if init_n_samples:
 algo.n_samples_leap = n_samples_leap
 algo.sos = sos
 algo.time_limit_minutes = time_limit_minutes
-algo.stabilization_count = stabilization_count
+algo.stop_stabilization_count = stop_stabilization_count
+algo.refinement_stabilization_count = refinement_stabilization_count
 
 try:
     algo.run(n_iterations)

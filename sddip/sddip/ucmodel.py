@@ -35,6 +35,8 @@ class ModelBuilder(ABC):
         # Generator state backsight variables
         # Given current stage t, x_bs[g][k] is the state of generator g at stage (t-k-1)
         self.x_bs = []
+        self.x_bs_p = []
+        self.x_bs_n = []
         # Storage charge/discharge
         self.ys_c = []
         self.ys_dc = []
@@ -104,6 +106,28 @@ class ModelBuilder(ABC):
                     vtype=self.bin_type, lb=0, ub=1, name="s_up_%i" % (g + 1)
                 )
             )
+            self.x_bs_p.append(
+                [
+                    self.model.addVar(
+                        vtype=gp.GRB.CONTINUOUS,
+                        lb=0,
+                        ub=1,
+                        name="x_bs_p_%i_%i" % (g + 1, k + 1),
+                    )
+                    for k in range(self.backsight_periods[g])
+                ]
+            )
+            self.x_bs_n.append(
+                [
+                    self.model.addVar(
+                        vtype=gp.GRB.CONTINUOUS,
+                        lb=0,
+                        ub=1,
+                        name="x_bs_n_%i_%i" % (g + 1, k + 1),
+                    )
+                    for k in range(self.backsight_periods[g])
+                ]
+            )
             self.s_down.append(
                 self.model.addVar(
                     vtype=self.bin_type, lb=0, ub=1, name="s_down_%i" % (g + 1)
@@ -162,10 +186,21 @@ class ModelBuilder(ABC):
         self.model.update()
 
     def add_objective(self, coefficients: list):
+        # x_bs_p = []
+        # x_bs_n = []
+        # for g in range(self.n_generators):
+        #     x_bs_p += self.x_bs_p[g]
+        x_bs_p = [x for g in range(self.n_generators) for x in self.x_bs_p[g]]
+        x_bs_n = [x for g in range(self.n_generators) for x in self.x_bs_n[g]]
 
         penalty = coefficients[-1]
-
-        coefficients = coefficients + [penalty] * (2 * self.n_storages + 1) + [1]
+        
+        coefficients = (
+            coefficients
+            + [penalty]
+            * (2 * self.n_storages + 2 * len(x_bs_p) + 1)
+            + [1]
+        )
 
         variables = (
             self.y
@@ -174,6 +209,8 @@ class ModelBuilder(ABC):
             + [self.ys_p, self.ys_n]
             + self.socs_p
             + self.socs_n
+            + x_bs_p
+            + x_bs_n
             + [self.delta]
             + [self.theta]
         )
@@ -368,7 +405,8 @@ class ModelBuilder(ABC):
 
         self.model.addConstrs(
             (
-                self.z_x_bs[g][k] == self.x_bs[g][k]
+                self.z_x_bs[g][k]
+                == self.x_bs[g][k] + self.x_bs_p[g][k] - self.x_bs_n[g][k]
                 for g in range(self.n_generators)
                 for k in range(self.backsight_periods[g])
             ),
@@ -497,7 +535,6 @@ class ModelBuilder(ABC):
         w = self.model.addVars(n_binaries, vtype=self.bin_type, name=f"w_{id}")
         u = self.model.addVars(n_binaries, vtype=self.bin_type, name=f"u_{id}")
 
-        # TODO Define Big-Ms
         m2 = [big_m] * n_binaries
         m4 = [big_m] * n_binaries
 

@@ -2,9 +2,9 @@ from sddip import algorithm, logger, storage
 
 
 # Parameters
-test_case = "case6ww"
+test_case = "WB5"
 
-n_iterations = 50
+n_iterations = 15
 time_limit_minutes = 3 * 60
 
 # Number of iterations after an unchanging

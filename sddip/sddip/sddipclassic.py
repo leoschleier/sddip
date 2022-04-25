@@ -6,14 +6,14 @@ import gurobipy as gp
 from scipy import stats, linalg
 from time import time
 
-from sddip.ucmodel import ModelBuilder
+from sddip.modelclassic import ClassicModel
 
 from sddip import (
     storage,
     utils,
     logger,
     dualsolver,
-    ucmodel,
+    modelclassic,
     parameters,
     scenarios,
 )
@@ -43,7 +43,6 @@ class SddipAlgorithm:
         self.stop_stabilization_count = 5
         self.refinement_stabilization_count = 2
         self.big_m = 10 ** 6
-        self.sos = False
         self.time_limit_minutes = 5 * 60
 
         # Helper objects
@@ -91,27 +90,81 @@ class SddipAlgorithm:
 
         self.bound_storage = storage.ResultStorage(ResultKeys.bound_keys, "bounds")
 
+    def fixed_binary_approximation(self):
+        self.bin_multipliers = {
+            "x": [1] * self.problem_params.n_gens,
+            "x_bs": [
+                [1] * self.problem_params.backsight_periods[g]
+                for g in range(self.problem_params.n_gens)
+            ],
+        }
+
+        continuous_variables_approx_error = []
+
+        y_bin_multipliers = []
+        self.y_0_bin = []
+        for p_max, p_init in zip(
+            self.problem_params.pg_max, self.problem_params.init_y_trial_point
+        ):
+            y_bin_multipliers.append(
+                self.binarizer.calc_binary_multipliers_from_n_binaries(
+                    p_max, self.n_binaries
+                )
+            )
+
+            prec = self.binarizer.calc_precision_from_n_binaries(p_max, self.n_binaries)
+
+            continuous_variables_approx_error.append(
+                self.binarizer.calc_max_abs_error(prec)
+            )
+
+            self.y_0_bin += self.binarizer.get_best_binary_approximation(
+                p_init, y_bin_multipliers[-1]
+            )[0]
+
+        soc_bin_multipliers = []
+        self.soc_0_bin = []
+        for s_max, soc_init in zip(
+            self.problem_params.soc_max, self.problem_params.init_soc_trial_point
+        ):
+            soc_bin_multipliers.append(
+                self.binarizer.calc_binary_multipliers_from_n_binaries(
+                    s_max, self.n_binaries
+                )
+            )
+
+            prec = self.binarizer.calc_precision_from_n_binaries(s_max, self.n_binaries)
+
+            continuous_variables_approx_error.append(
+                self.binarizer.calc_max_abs_error(prec)
+            )
+
+            self.soc_0_bin += self.binarizer.get_best_binary_approximation(
+                soc_init, soc_bin_multipliers[-1]
+            )[0]
+
+        print(f"Approximation errors: {continuous_variables_approx_error}")
+
+        self.bin_multipliers["y"] = y_bin_multipliers
+        self.bin_multipliers["soc"] = soc_bin_multipliers
+
     def run(self, n_iterations: int):
         print("#### SDDiP-Algorithm started ####")
         self.runtime_logger.start()
         self.dual_solver.runtime_logger.start()
         lower_bounds = []
         lagrangian_cut_iterations = []
+
+        self.fixed_binary_approximation()
+
         for i in range(n_iterations):
             print(f"Iteration {i+1}")
 
             ########################################
-            # Binary approximation refinement
+            # Cut mode selection
             ########################################
-            refinement_start_time = time()
-            self.binary_approximation_refinement(
-                i, lower_bounds, lagrangian_cut_iterations
-            )
             if not self.init_cut_mode == "l":
                 self.select_cut_mode(i, lower_bounds)
-            self.runtime_logger.log_task_end(
-                f"binary_approximation_refinement_i{i+1}", refinement_start_time
-            )
 
             ########################################
             # Sampling
@@ -228,15 +281,22 @@ class SddipAlgorithm:
 
         for k in range(n_samples):
             x_trial_point = self.problem_params.init_x_trial_point
-            y_trial_point = self.problem_params.init_y_trial_point
+            y_trial_point = self.y_0_bin
             x_bs_trial_point = self.problem_params.init_x_bs_trial_point
-            soc_trial_point = self.problem_params.init_soc_trial_point
+            soc_trial_point = self.soc_0_bin
 
             v_opt_k.append(0)
             for t, n in zip(range(self.problem_params.n_stages), samples[k]):
 
+                y_binary_trial_multipliers = linalg.block_diag(
+                    *self.bin_multipliers["y"]
+                )
+                soc_binary_trial_multipliers = linalg.block_diag(
+                    *self.bin_multipliers["soc"]
+                )
+
                 # Create forward model
-                uc_fw = ucmodel.ForwardModelBuilder(
+                uc_fw = modelclassic.ClassicModel(
                     self.problem_params.n_buses,
                     self.problem_params.n_lines,
                     self.problem_params.n_gens,
@@ -246,23 +306,62 @@ class SddipAlgorithm:
                     self.problem_params.backsight_periods,
                 )
 
-                uc_fw: ucmodel.ForwardModelBuilder = self.add_problem_constraints(
+                uc_fw.binary_approximation(
+                    self.bin_multipliers["y"], self.bin_multipliers["soc"]
+                )
+
+                uc_fw: modelclassic.ClassicModel = self.add_problem_constraints(
                     uc_fw, t, n, i
                 )
 
-                uc_fw.add_copy_constraints(
+                uc_fw.add_sddip_copy_constraints(
                     x_trial_point, y_trial_point, x_bs_trial_point, soc_trial_point,
+                )
+
+                uc_fw.add_copy_constraints(
+                    y_binary_trial_multipliers, soc_binary_trial_multipliers
                 )
 
                 # Solve problem
                 uc_fw.disable_output()
                 uc_fw.model.optimize()
+                # if len(samples) < 3:
+                #     total_slack = uc_fw.delta.x
+                #     total_slack += uc_fw.ys_n.x + uc_fw.ys_p.x
+                #     y_slack = uc_fw.ys_n.x + uc_fw.ys_p.x
+                #     s_slack = 0
+                #     for s in range(self.problem_params.n_storages):
+                #         total_slack += uc_fw.socs_n[s].x + uc_fw.socs_p[s].x
+                #         s_slack += uc_fw.socs_n[s].x + uc_fw.socs_p[s].x
+                #     x_slack = 0
+                #     for x_p in uc_fw.x_bs_p:
+                #         for val in x_p:
+                #             total_slack += val.x
+                #             x_slack += val.x
+                #     for x_n in uc_fw.x_bs_n:
+                #         for val in x_n:
+                #             total_slack += val.x
+                #             x_slack += val.x
+                #     print(f"Total Slack: {total_slack}")
+                # print(f"Delta-Slack: {uc_fw.delta.x}")
+                # print(f"s-Slack: {s_slack}")
+                # print(f"x-Slack: {x_slack}")
+                # print(f"y-Slack: {y_slack}")
+                #     if total_slack > 20:
+                #         print(f"Model export: Stage {t}")
+                #         uc_fw.model.write("model.lp")
 
                 try:
                     x_kt = [x_g.x for x_g in uc_fw.x]
-                    y_kt = [y_g.x for y_g in uc_fw.y]
+                    y_kt = [
+                        y_bin.x for y_g in uc_fw.y_bin_states for y_bin in y_g.values()
+                    ]
                     x_bs_kt = [[x_bs.x for x_bs in x_bs_g] for x_bs_g in uc_fw.x_bs]
-                    soc_kt = [soc_s.x for soc_s in uc_fw.soc]
+                    soc_kt = [
+                        soc_bin.x
+                        for soc_s in uc_fw.soc_bin_states
+                        for soc_bin in soc_s.values()
+                    ]
                 except AttributeError:
                     uc_fw.model.write("model.lp")
                     uc_fw.model.computeIIS()
@@ -304,42 +403,6 @@ class SddipAlgorithm:
 
         return v_upper_l, v_uppper_r
 
-    def binary_approximation_refinement(
-        self, iteration: int, lower_bounds: list, lagrangian_cut_iterations: list
-    ):
-        # Check if refinment condition is true
-        refinement_condition = False
-
-        if (
-            len(lagrangian_cut_iterations) >= (self.refinement_stabilization_count + 1)
-            and iteration > 1
-        ):
-            delta = (
-                lower_bounds[-1]
-                - lower_bounds[
-                    lagrangian_cut_iterations[
-                        -(self.refinement_stabilization_count + 1)
-                    ]
-                ]
-            )
-            refinement_condition = delta <= self.refinement_tolerance
-
-        if refinement_condition and self.cut_mode == "l":
-            print("Refinement performed.")
-            self.n_binaries += 1 if self.n_binaries < self.max_n_binaries else 0
-
-        upper_bounds = self.problem_params.pg_max + self.problem_params.soc_max
-
-        continuous_variables_precision = [
-            self.binarizer.calc_precision_from_n_binaries(ub, self.n_binaries)
-            for ub in upper_bounds
-        ]
-        continuous_variables_approx_error = [
-            self.binarizer.calc_max_abs_error(prec)
-            for prec in continuous_variables_precision
-        ]
-        print(f"Approximation errors: {continuous_variables_approx_error}")
-
     def select_cut_mode(self, iteration: int, lower_bounds: list):
         no_improvement_condition = False
 
@@ -367,7 +430,7 @@ class SddipAlgorithm:
 
                 for n in range(n_realizations):
                     # Get mixed_integer trial points
-                    y_float_vars = self.ps_storage.get_result(i - 1, k, t - 1)[
+                    y_binary_trial_point = self.ps_storage.get_result(i - 1, k, t - 1)[
                         ResultKeys.y_key
                     ]
                     x_binary_trial_point = self.ps_storage.get_result(i - 1, k, t - 1)[
@@ -376,49 +439,19 @@ class SddipAlgorithm:
                     x_bs_binary_trial_point = self.ps_storage.get_result(
                         i - 1, k, t - 1
                     )[ResultKeys.x_bs_key]
-                    soc_float_vars = self.ps_storage.get_result(i - 1, k, t - 1)[
-                        ResultKeys.soc_key
-                    ]
+                    soc_binary_trial_point = self.ps_storage.get_result(
+                        i - 1, k, t - 1
+                    )[ResultKeys.soc_key]
 
-                    # Binarize trial points
-                    y_bin_vars = []
-                    y_bin_multipliers = []
-                    for j in range(len(y_float_vars)):
-                        (
-                            new_y_vars,
-                            new_y_multipliers,
-                        ) = self.binarizer.binary_expansion_from_n_binaries(
-                            y_float_vars[j],
-                            self.problem_params.pg_max[j],
-                            self.n_binaries,
-                        )
-                        y_bin_vars += new_y_vars
-                        y_bin_multipliers.append(new_y_multipliers)
-
-                    soc_bin_vars = []
-                    soc_bin_multipliers = []
-                    for j in range(len(soc_float_vars)):
-                        (
-                            new_soc_vars,
-                            new_soc_multipliers,
-                        ) = self.binarizer.binary_expansion_from_n_binaries(
-                            soc_float_vars[j],
-                            self.problem_params.soc_max[j],
-                            self.n_binaries,
-                        )
-                        soc_bin_vars += new_soc_vars
-                        soc_bin_multipliers.append(new_soc_multipliers)
-
-                    # Binarized trial points
-                    y_binary_trial_point = y_bin_vars
-                    y_binary_trial_multipliers = linalg.block_diag(*y_bin_multipliers)
-                    soc_binary_trial_point = soc_bin_vars
+                    y_binary_trial_multipliers = linalg.block_diag(
+                        *self.bin_multipliers["y"]
+                    )
                     soc_binary_trial_multipliers = linalg.block_diag(
-                        *soc_bin_multipliers
+                        *self.bin_multipliers["soc"]
                     )
 
                     # Build backward model
-                    uc_bw = ucmodel.BackwardModelBuilder(
+                    uc_bw = modelclassic.ClassicModel(
                         self.problem_params.n_buses,
                         self.problem_params.n_lines,
                         self.problem_params.n_gens,
@@ -428,15 +461,19 @@ class SddipAlgorithm:
                         self.problem_params.backsight_periods,
                     )
 
-                    uc_bw.add_relaxation(
+                    uc_bw.binary_approximation(
+                        self.bin_multipliers["y"], self.bin_multipliers["soc"]
+                    )
+
+                    uc_bw: modelclassic.ClassicModel = self.add_problem_constraints(
+                        uc_bw, t, n, i
+                    )
+
+                    uc_bw.relax_sddip_copy_constraints(
                         x_binary_trial_point,
                         y_binary_trial_point,
                         x_bs_binary_trial_point,
                         soc_binary_trial_point,
-                    )
-
-                    uc_bw: ucmodel.BackwardModelBuilder = self.add_problem_constraints(
-                        uc_bw, t, n, i
                     )
 
                     uc_bw.add_copy_constraints(
@@ -445,6 +482,10 @@ class SddipAlgorithm:
 
                     objective_terms = uc_bw.objective_terms
                     relaxed_terms = uc_bw.relaxed_terms
+
+                    # if t == 1 and n == 1:
+                    #     print(relaxed_terms)
+                    #     uc_bw.model.write("model.lp")
 
                     uc_bw.disable_output()
 
@@ -504,7 +545,7 @@ class SddipAlgorithm:
             for k in range(n_samples):
                 n_realizations = self.problem_params.n_realizations_per_stage[t]
                 bc_dict = self.bc_storage.create_empty_result_dict()
-                y_trial_point = self.ps_storage.get_result(i - 1, k, t - 1)[
+                y_binary_trial_point = self.ps_storage.get_result(i - 1, k, t - 1)[
                     ResultKeys.y_key
                 ]
                 x_trial_point = self.ps_storage.get_result(i - 1, k, t - 1)[
@@ -513,15 +554,22 @@ class SddipAlgorithm:
                 x_bs_trial_point = self.ps_storage.get_result(i - 1, k, t - 1)[
                     ResultKeys.x_bs_key
                 ]
-                soc_trial_point = self.ps_storage.get_result(i - 1, k, t - 1)[
+                soc_binary_trial_point = self.ps_storage.get_result(i - 1, k, t - 1)[
                     ResultKeys.soc_key
                 ]
 
                 trial_point = (
                     x_trial_point
-                    + y_trial_point
+                    + y_binary_trial_point
                     + [val for bs in x_bs_trial_point for val in bs]
-                    + soc_trial_point
+                    + soc_binary_trial_point
+                )
+
+                y_binary_trial_multipliers = linalg.block_diag(
+                    *self.bin_multipliers["y"]
+                )
+                soc_binary_trial_multipliers = linalg.block_diag(
+                    *self.bin_multipliers["soc"]
                 )
 
                 dual_multipliers = []
@@ -529,7 +577,7 @@ class SddipAlgorithm:
 
                 for n in range(n_realizations):
                     # Create forward model
-                    uc_fw = ucmodel.ForwardModelBuilder(
+                    uc_fw = ClassicModel(
                         self.problem_params.n_buses,
                         self.problem_params.n_lines,
                         self.problem_params.n_gens,
@@ -540,30 +588,31 @@ class SddipAlgorithm:
                         lp_relax=True,
                     )
 
-                    uc_fw: ucmodel.ForwardModelBuilder = self.add_problem_constraints(
-                        uc_fw, t, n, i
+                    uc_fw.binary_approximation(
+                        self.bin_multipliers["y"], self.bin_multipliers["soc"]
+                    )
+
+                    uc_fw: ClassicModel = self.add_problem_constraints(uc_fw, t, n, i)
+
+                    uc_fw.add_sddip_copy_constraints(
+                        x_trial_point,
+                        y_binary_trial_point,
+                        x_bs_trial_point,
+                        soc_binary_trial_point,
                     )
 
                     uc_fw.add_copy_constraints(
-                        x_trial_point, y_trial_point, x_bs_trial_point, soc_trial_point,
+                        y_binary_trial_multipliers, soc_binary_trial_multipliers
                     )
 
                     uc_fw.model.optimize()
 
-                    copy_constrs = [
-                        uc_fw.copy_constraints_x,
-                        uc_fw.copy_constraints_y,
-                        uc_fw.copy_constraints_x_bs,
-                        uc_fw.copy_constraints_soc,
-                    ]
+                    copy_constrs = uc_fw.sddip_copy_constrs
 
                     dm = []
                     try:
-                        for constr_set in copy_constrs:
-                            dm += [
-                                constr.getAttr(gp.GRB.attr.Pi)
-                                for _, constr in constr_set.items()
-                            ]
+                        for constr in copy_constrs:
+                            dm.append(constr.getAttr(gp.GRB.attr.Pi))
                     except AttributeError:
                         uc_fw.model.write("model.lp")
                         uc_fw.model.computeIIS()
@@ -575,7 +624,7 @@ class SddipAlgorithm:
                     if self.cut_mode == "b":
                         opt_values.append(uc_fw.model.getObjective().getValue())
                     elif self.cut_mode == "sb":
-                        dual_model = ucmodel.ForwardModelBuilder(
+                        dual_model = ClassicModel(
                             self.problem_params.n_buses,
                             self.problem_params.n_lines,
                             self.problem_params.n_gens,
@@ -584,16 +633,23 @@ class SddipAlgorithm:
                             self.problem_params.storages_at_bus,
                             self.problem_params.backsight_periods,
                         )
-                        dual_model: ucmodel.ForwardModelBuilder = self.add_problem_constraints(
+                        dual_model.binary_approximation(
+                            self.bin_multipliers["y"], self.bin_multipliers["soc"]
+                        )
+                        dual_model: ClassicModel = self.add_problem_constraints(
                             dual_model, t, n, i
                         )
-
-                        copy_terms = dual_model.get_copy_terms(
+                        dual_model.relax_sddip_copy_constraints(
                             x_trial_point,
-                            y_trial_point,
+                            y_binary_trial_point,
                             x_bs_trial_point,
-                            soc_trial_point,
+                            soc_binary_trial_point,
                         )
+                        dual_model.add_copy_constraints(
+                            y_binary_trial_multipliers, soc_binary_trial_multipliers
+                        )
+
+                        copy_terms = dual_model.relaxed_terms
 
                         _, dual_value = self.dual_solver.get_subgradient_and_value(
                             dual_model.model, dual_model.objective_terms, copy_terms, dm
@@ -617,12 +673,15 @@ class SddipAlgorithm:
         i = iteration
 
         x_trial_point = self.problem_params.init_x_trial_point
-        y_trial_point = self.problem_params.init_y_trial_point
+        y_trial_point = self.y_0_bin
         x_bs_trial_point = self.problem_params.init_x_bs_trial_point
-        soc_trial_point = self.problem_params.init_soc_trial_point
+        soc_trial_point = self.soc_0_bin
+
+        y_binary_trial_multipliers = linalg.block_diag(*self.bin_multipliers["y"])
+        soc_binary_trial_multipliers = linalg.block_diag(*self.bin_multipliers["soc"])
 
         # Create forward model
-        uc_fw = ucmodel.ForwardModelBuilder(
+        uc_fw = ClassicModel(
             self.problem_params.n_buses,
             self.problem_params.n_lines,
             self.problem_params.n_gens,
@@ -632,12 +691,18 @@ class SddipAlgorithm:
             self.problem_params.backsight_periods,
         )
 
-        uc_fw: ucmodel.ForwardModelBuilder = self.add_problem_constraints(
-            uc_fw, t, n, i
+        uc_fw.binary_approximation(
+            self.bin_multipliers["y"], self.bin_multipliers["soc"]
+        )
+
+        uc_fw: ClassicModel = self.add_problem_constraints(uc_fw, t, n, i)
+
+        uc_fw.add_sddip_copy_constraints(
+            x_trial_point, y_trial_point, x_bs_trial_point, soc_trial_point
         )
 
         uc_fw.add_copy_constraints(
-            x_trial_point, y_trial_point, x_bs_trial_point, soc_trial_point
+            y_binary_trial_multipliers, soc_binary_trial_multipliers
         )
 
         # Solve problem
@@ -651,11 +716,11 @@ class SddipAlgorithm:
 
     def add_problem_constraints(
         self,
-        model_builder: ucmodel.ModelBuilder,
+        model_builder: modelclassic.ClassicModel,
         stage: int,
         realization: int,
         iteration: int,
-    ) -> ucmodel.ModelBuilder:
+    ) -> modelclassic.ClassicModel:
 
         model_builder.add_objective(self.problem_params.cost_coeffs)
 
@@ -706,14 +771,10 @@ class SddipAlgorithm:
 
         if stage < self.problem_params.n_stages - 1 and iteration > 0:
             if "l" in self.cut_types_added:
-                cut_coefficients = self.cc_storage.get_stage_result(stage)
+                lagrangian_coefficients = self.cc_storage.get_stage_result(stage)
                 model_builder.add_cut_constraints(
-                    cut_coefficients[ResultKeys.ci_key],
-                    cut_coefficients[ResultKeys.cg_key],
-                    cut_coefficients[ResultKeys.y_bm_key],
-                    cut_coefficients[ResultKeys.soc_bm_key],
-                    self.big_m,
-                    self.sos,
+                    lagrangian_coefficients[ResultKeys.ci_key],
+                    lagrangian_coefficients[ResultKeys.cg_key],
                 )
             if bool(self.cut_types_added & {"b", "sb"}):
                 benders_coefficients = self.bc_storage.get_stage_result(stage)

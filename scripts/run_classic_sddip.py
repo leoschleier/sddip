@@ -1,4 +1,4 @@
-from sddip import algorithm, logger, storage
+from sddip import sddipclassic, logger, storage
 
 
 # Parameters
@@ -12,24 +12,18 @@ time_limit_minutes = 3 * 60
 stop_stabilization_count = 50
 refinement_stabilization_count = 1
 
-init_n_binaries = 5
+init_n_binaries = 10
 
 # Gradual increase in number of samples
 n_samples_leap = 0
 
 # Starting cut mode
-# b: Bender's cuts
+# b: Benders' cuts
 # sb: Strengthened Benders' cuts
 # l: Lagrangian cuts
 # If starting cut mode is 'l', then it will not be changed throughout the algorithm
 init_cut_mode = "l"
 init_n_samples = 1
-
-# Note: Sos-constraint in the cut projection cannot be used
-# in combination with Benders cuts due to the LP relaxation
-sos = False
-big_m = 10 ** 5
-
 
 # Logger
 log_manager = logger.LogManager()
@@ -37,13 +31,13 @@ log_dir = log_manager.create_log_dir("log")
 
 
 # Execution
-algo = algorithm.SddipAlgorithm(test_case, log_dir, method="bm", cut_mode=init_cut_mode)
-algo.big_m = big_m
+algo = sddipclassic.SddipAlgorithm(
+    test_case, log_dir, method="bm", cut_mode=init_cut_mode
+)
 algo.n_binaries = init_n_binaries
 if init_n_samples:
     algo.n_samples = init_n_samples
 algo.n_samples_leap = n_samples_leap
-algo.sos = sos
 algo.time_limit_minutes = time_limit_minutes
 algo.stop_stabilization_count = stop_stabilization_count
 algo.refinement_stabilization_count = refinement_stabilization_count

@@ -194,12 +194,9 @@ class ModelBuilder(ABC):
         x_bs_n = [x for g in range(self.n_generators) for x in self.x_bs_n[g]]
 
         penalty = coefficients[-1]
-        
+
         coefficients = (
-            coefficients
-            + [penalty]
-            * (2 * self.n_storages + 2 * len(x_bs_p) + 1)
-            + [1]
+            coefficients + [penalty] * (2 * self.n_storages + 2 * len(x_bs_p) + 1) + [1]
         )
 
         variables = (
@@ -442,11 +439,9 @@ class ModelBuilder(ABC):
         n_state_variables = len(state_variables)
 
         if not n_state_variables == len(trial_point):
-            print(trial_point)
             raise ValueError(
                 "Number of state variables must be equal to the number of trial points."
             )
-        # print(cut_gradient)
 
         self.model.addConstr(
             (
@@ -701,6 +696,7 @@ class BackwardModelBuilder(ModelBuilder):
         generators_at_bus: list,
         storages_at_bus: list,
         backsight_periods: list,
+        lp_relax: bool = False,
     ) -> None:
         super().__init__(
             n_buses,
@@ -710,6 +706,7 @@ class BackwardModelBuilder(ModelBuilder):
             generators_at_bus,
             storages_at_bus,
             backsight_periods,
+            lp_relax,
         )
 
         self.n_x_trial_binaries = None

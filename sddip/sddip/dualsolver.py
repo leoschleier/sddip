@@ -1,6 +1,6 @@
 import copy
 import os
-from abc import ABC
+from abc import ABC, abstractmethod
 from enum import Enum
 from time import time
 
@@ -36,6 +36,10 @@ class DualSolver(ABC):
 
         self.results = SolverResults()
 
+    @abstractmethod
+    def solve(self):
+        pass
+
     def get_subgradient_and_value(
         self, model, objective_terms, relaxed_terms, dual_multipliers
     ):
@@ -58,6 +62,11 @@ class DualSolver(ABC):
         opt_value = model.getObjective().getValue()
 
         return (subgradient, opt_value)
+
+    def on_solver_call(self):
+        self.n_calls += 1
+        self.solver_time = 0
+        self.log_task_start()
 
     def print_method_finished(
         self,
@@ -104,12 +113,9 @@ class SubgradientMethod(DualSolver):
         log_id: str = None,
     ) -> gp.Model:
 
-        self.n_calls += 1
-        self.solver_time = 0
-
-        self.log_task_start()
-
+        self.on_solver_call()
         model.setParam("OutputFlag", 0)
+
         if self.log_flag:
             current_log_dir = self.create_subgradient_log_dir(log_id)
             gurobi_logger = logger.GurobiLogger(current_log_dir)
@@ -298,11 +304,9 @@ class BundleMethod(DualSolver):
         self.m_r = 0.7
 
     def solve(self, model: gp.Model, objective_terms, relaxed_terms):
-        model.setParam("OutputFlag", 0)
-        self.n_calls += 1
-        self.solver_time = 0
 
-        self.log_task_start()
+        self.on_solver_call()
+        model.setParam("OutputFlag", 0)
 
         tolerance_reached = False
         u = self.u_init

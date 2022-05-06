@@ -785,13 +785,15 @@ class Algorithm:
         model_builder.add_cut_lower_bound(self.problem_params.cut_lb[stage])
 
         if stage < self.problem_params.n_stages - 1 and iteration > 0:
-            if "l" in self.cut_types_added:
+            if CutModes.LAGRANGIAN in self.cut_types_added:
                 lagrangian_coefficients = self.cc_storage.get_stage_result(stage)
                 model_builder.add_cut_constraints(
                     lagrangian_coefficients[ResultKeys.ci_key],
                     lagrangian_coefficients[ResultKeys.cg_key],
                 )
-            if bool(self.cut_types_added & {"b", "sb"}):
+            if bool(
+                self.cut_types_added & {CutModes.BENDERS, CutModes.STRENGTHENED_BENDERS}
+            ):
                 benders_coefficients = self.bc_storage.get_stage_result(stage)
                 model_builder.add_benders_cuts(
                     benders_coefficients[ResultKeys.bc_intercept_key],

@@ -362,7 +362,7 @@ class Algorithm:
             self.cut_mode = CutModes.STRENGTHENED_BENDERS
             self.n_samples = self.max_n_samples
         elif no_improvement_condition:
-            self.cut_mode = CutModes.STRENGTHENED_BENDERS
+            self.cut_mode = CutModes.LAGRANGIAN
             self.n_samples = 1
 
     def backward_pass(self, iteration: int, samples: list):
@@ -716,7 +716,7 @@ class Algorithm:
         model_builder.add_cut_lower_bound(self.problem_params.cut_lb[stage])
 
         if stage < self.problem_params.n_stages - 1 and iteration > 0:
-            if "l" in self.cut_types_added:
+            if CutModes.LAGRANGIAN in self.cut_types_added:
                 cut_coefficients = self.cc_storage.get_stage_result(stage)
                 model_builder.add_cut_constraints(
                     cut_coefficients[ResultKeys.ci_key],
@@ -726,7 +726,9 @@ class Algorithm:
                     self.big_m,
                     self.sos,
                 )
-            if bool(self.cut_types_added & {"b", "sb"}):
+            if bool(
+                self.cut_types_added & {CutModes.BENDERS, CutModes.STRENGTHENED_BENDERS}
+            ):
                 benders_coefficients = self.bc_storage.get_stage_result(stage)
                 model_builder.add_benders_cuts(
                     benders_coefficients[ResultKeys.bc_intercept_key],

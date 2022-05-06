@@ -23,7 +23,7 @@ n_samples_leap = 0
 # sb: Strengthened Benders' cuts
 # l: Lagrangian cuts
 # If starting cut mode is 'l', then it will not be changed throughout the algorithm
-init_cut_mode = CutModes.LAGRANGIAN
+init_cut_mode = CutModes.STRENGTHENED_BENDERS
 init_n_samples = 1
 
 # Logger

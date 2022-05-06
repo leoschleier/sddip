@@ -1,11 +1,18 @@
+import copy
+import os
 from abc import ABC
-import random
+from enum import Enum
+from time import time
+
 import gurobipy as gp
 import numpy as np
-from time import time
-import os
+
 from sddip import logger
-import copy
+
+
+class DualSolverMethods(Enum):
+    BUNDLE_METHOD = "bm"
+    SUBGRADIENT_METHOD = "sg"
 
 
 class DualSolver(ABC):

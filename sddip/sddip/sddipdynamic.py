@@ -1,28 +1,36 @@
-import os
-from typing import Set
-import numpy as np
-import pandas as pd
-import gurobipy as gp
-from scipy import stats, linalg
+from enum import Enum
 from time import time
 
-from sddip.ucmodel import ModelBuilder
+import gurobipy as gp
+import numpy as np
+from scipy import linalg, stats
 
 from sddip import (
-    storage,
-    utils,
-    logger,
     dualsolver,
-    ucmodel,
+    logger,
     parameters,
     scenarios,
+    storage,
+    ucmodeldynamic,
+    utils,
 )
 from sddip.constants import ResultKeys
+from sddip.dualsolver import DualSolverMethods
 
 
-class SddipAlgorithm:
+class CutModes(Enum):
+    BENDERS = "b"
+    STRENGTHENED_BENDERS = "sb"
+    LAGRANGIAN = "l"
+
+
+class Algorithm:
     def __init__(
-        self, test_case: str, log_dir: str, method: str = "bm", cut_mode: str = "l",
+        self,
+        test_case: str,
+        log_dir: str,
+        dual_solver_method: DualSolverMethods = DualSolverMethods.BUNDLE_METHOD,
+        cut_mode: CutModes = CutModes.LAGRANGIAN,
     ):
         # Logger
         self.runtime_logger = logger.RuntimeLogger(log_dir)
@@ -55,16 +63,17 @@ class SddipAlgorithm:
 
         ds_max_iterations = 5000
 
-        if method == "sg":
+        self.dual_solver = None
+        if dual_solver_method == DualSolverMethods.SUBGRADIENT_METHOD:
             self.dual_solver = dualsolver.SubgradientMethod(
                 ds_max_iterations, 10 ** -3, log_dir
             )
-        elif method == "bm":
+        elif dual_solver_method == DualSolverMethods.BUNDLE_METHOD:
             self.dual_solver = dualsolver.BundleMethod(
                 ds_max_iterations, 10 ** -1, log_dir
             )
         else:
-            raise ValueError(f"Method '{method}' does not exist.")
+            raise ValueError(f"Method '{dual_solver_method}' does not exist.")
 
         self.init_cut_mode = cut_mode
         self.cut_mode = self.init_cut_mode
@@ -107,7 +116,7 @@ class SddipAlgorithm:
             self.binary_approximation_refinement(
                 i, lower_bounds, lagrangian_cut_iterations
             )
-            if not self.init_cut_mode == "l":
+            if not self.init_cut_mode == CutModes.LAGRANGIAN:
                 self.select_cut_mode(i, lower_bounds)
             self.runtime_logger.log_task_end(
                 f"binary_approximation_refinement_i{i+1}", refinement_start_time
@@ -145,13 +154,15 @@ class SddipAlgorithm:
             # Backward pass
             ########################################
             backward_pass_start_time = time()
-            if self.cut_mode == "l":
+            if self.cut_mode == CutModes.LAGRANGIAN:
                 lagrangian_cut_iterations.append(i)
                 self.backward_pass(i + 1, samples)
-                self.cut_types_added.update(["l"])
-            elif self.cut_mode in ["b", "sb"]:
+                self.cut_types_added.update([CutModes.LAGRANGIAN])
+            elif self.cut_mode in [CutModes.BENDERS, CutModes.STRENGTHENED_BENDERS]:
                 self.backward_benders(i + 1, samples)
-                self.cut_types_added.update(["b", "sb"])
+                self.cut_types_added.update(
+                    [CutModes.BENDERS, CutModes.STRENGTHENED_BENDERS]
+                )
             self.runtime_logger.log_task_end(
                 f"backward_pass_i{i+1}", backward_pass_start_time
             )
@@ -236,7 +247,7 @@ class SddipAlgorithm:
             for t, n in zip(range(self.problem_params.n_stages), samples[k]):
 
                 # Create forward model
-                uc_fw = ucmodel.ForwardModelBuilder(
+                uc_fw = ucmodeldynamic.ForwardModelBuilder(
                     self.problem_params.n_buses,
                     self.problem_params.n_lines,
                     self.problem_params.n_gens,
@@ -246,7 +257,7 @@ class SddipAlgorithm:
                     self.problem_params.backsight_periods,
                 )
 
-                uc_fw: ucmodel.ForwardModelBuilder = self.add_problem_constraints(
+                uc_fw: ucmodeldynamic.ForwardModelBuilder = self.add_problem_constraints(
                     uc_fw, t, n, i
                 )
 
@@ -324,7 +335,7 @@ class SddipAlgorithm:
             )
             refinement_condition = delta <= self.refinement_tolerance
 
-        if refinement_condition and self.cut_mode == "l":
+        if refinement_condition and self.cut_mode == CutModes.LAGRANGIAN:
             print("Refinement performed.")
             self.n_binaries += 1 if self.n_binaries < self.max_n_binaries else 0
 
@@ -347,11 +358,11 @@ class SddipAlgorithm:
             delta = max((lower_bounds[-1] - lower_bounds[-2]), 0)
             no_improvement_condition = delta <= self.no_improvement_tolerance
 
-        if self.cut_mode == "l":
-            self.cut_mode = "sb"
+        if self.cut_mode == CutModes.LAGRANGIAN:
+            self.cut_mode = CutModes.STRENGTHENED_BENDERS
             self.n_samples = self.max_n_samples
         elif no_improvement_condition:
-            self.cut_mode = "l"
+            self.cut_mode = CutModes.STRENGTHENED_BENDERS
             self.n_samples = 1
 
     def backward_pass(self, iteration: int, samples: list):
@@ -418,7 +429,7 @@ class SddipAlgorithm:
                     )
 
                     # Build backward model
-                    uc_bw = ucmodel.BackwardModelBuilder(
+                    uc_bw = ucmodeldynamic.BackwardModelBuilder(
                         self.problem_params.n_buses,
                         self.problem_params.n_lines,
                         self.problem_params.n_gens,
@@ -435,7 +446,7 @@ class SddipAlgorithm:
                         soc_binary_trial_point,
                     )
 
-                    uc_bw: ucmodel.BackwardModelBuilder = self.add_problem_constraints(
+                    uc_bw: ucmodeldynamic.BackwardModelBuilder = self.add_problem_constraints(
                         uc_bw, t, n, i
                     )
 
@@ -529,7 +540,7 @@ class SddipAlgorithm:
 
                 for n in range(n_realizations):
                     # Create forward model
-                    uc_fw = ucmodel.ForwardModelBuilder(
+                    uc_fw = ucmodeldynamic.ForwardModelBuilder(
                         self.problem_params.n_buses,
                         self.problem_params.n_lines,
                         self.problem_params.n_gens,
@@ -540,7 +551,7 @@ class SddipAlgorithm:
                         lp_relax=True,
                     )
 
-                    uc_fw: ucmodel.ForwardModelBuilder = self.add_problem_constraints(
+                    uc_fw: ucmodeldynamic.ForwardModelBuilder = self.add_problem_constraints(
                         uc_fw, t, n, i
                     )
 
@@ -572,10 +583,10 @@ class SddipAlgorithm:
 
                     dual_multipliers.append(dm)
 
-                    if self.cut_mode == "b":
+                    if self.cut_mode == CutModes.BENDERS:
                         opt_values.append(uc_fw.model.getObjective().getValue())
-                    elif self.cut_mode == "sb":
-                        dual_model = ucmodel.ForwardModelBuilder(
+                    elif self.cut_mode == CutModes.STRENGTHENED_BENDERS:
+                        dual_model = ucmodeldynamic.ForwardModelBuilder(
                             self.problem_params.n_buses,
                             self.problem_params.n_lines,
                             self.problem_params.n_gens,
@@ -584,7 +595,7 @@ class SddipAlgorithm:
                             self.problem_params.storages_at_bus,
                             self.problem_params.backsight_periods,
                         )
-                        dual_model: ucmodel.ForwardModelBuilder = self.add_problem_constraints(
+                        dual_model: ucmodeldynamic.ForwardModelBuilder = self.add_problem_constraints(
                             dual_model, t, n, i
                         )
 
@@ -622,7 +633,7 @@ class SddipAlgorithm:
         soc_trial_point = self.problem_params.init_soc_trial_point
 
         # Create forward model
-        uc_fw = ucmodel.ForwardModelBuilder(
+        uc_fw = ucmodeldynamic.ForwardModelBuilder(
             self.problem_params.n_buses,
             self.problem_params.n_lines,
             self.problem_params.n_gens,
@@ -632,7 +643,7 @@ class SddipAlgorithm:
             self.problem_params.backsight_periods,
         )
 
-        uc_fw: ucmodel.ForwardModelBuilder = self.add_problem_constraints(
+        uc_fw: ucmodeldynamic.ForwardModelBuilder = self.add_problem_constraints(
             uc_fw, t, n, i
         )
 
@@ -651,11 +662,11 @@ class SddipAlgorithm:
 
     def add_problem_constraints(
         self,
-        model_builder: ucmodel.ModelBuilder,
+        model_builder: ucmodeldynamic.ModelBuilder,
         stage: int,
         realization: int,
         iteration: int,
-    ) -> ucmodel.ModelBuilder:
+    ) -> ucmodeldynamic.ModelBuilder:
 
         model_builder.add_objective(self.problem_params.cost_coeffs)
 

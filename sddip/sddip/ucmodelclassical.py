@@ -1,12 +1,9 @@
-from abc import ABC, abstractmethod
 import gurobipy as gp
-import numpy as np
-from scipy import linalg
-from sddip.ucmodel import BackwardModelBuilder
-from sddip import ucmodel
+
+from sddip.ucmodeldynamic import BackwardModelBuilder
 
 
-class ClassicModel(BackwardModelBuilder):
+class ClassicalModel(BackwardModelBuilder):
     def __init__(
         self,
         n_buses: int,
@@ -68,15 +65,21 @@ class ClassicModel(BackwardModelBuilder):
         ]
 
         self.model.addConstrs(
-            (gp.LinExpr(y_bin_multipliers[g], self.y_bin_states[g].select("*"))
-            == self.y[g]
-            for g in range(self.n_generators)), name="y_bin_appr"
+            (
+                gp.LinExpr(y_bin_multipliers[g], self.y_bin_states[g].select("*"))
+                == self.y[g]
+                for g in range(self.n_generators)
+            ),
+            name="y_bin_appr",
         )
 
         self.model.addConstrs(
-            (gp.LinExpr(soc_bin_multipliers[s], self.soc_bin_states[s].select("*"))
-            == self.soc[s]
-            for s in range(self.n_storages)), name="soc_bin_appr"
+            (
+                gp.LinExpr(soc_bin_multipliers[s], self.soc_bin_states[s].select("*"))
+                == self.soc[s]
+                for s in range(self.n_storages)
+            ),
+            name="soc_bin_appr",
         )
         self.update_model()
 

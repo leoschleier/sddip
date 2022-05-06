@@ -1,5 +1,6 @@
-from sddip import sddipclassic, logger, storage
-
+from sddip import logger, sddipclassical, storage
+from sddip.dualsolver import DualSolverMethods
+from sddip.sddipclassical import CutModes
 
 # Parameters
 test_case = "case6ww"
@@ -12,7 +13,7 @@ time_limit_minutes = 3 * 60
 stop_stabilization_count = 50
 refinement_stabilization_count = 1
 
-init_n_binaries = 10
+init_n_binaries = 5
 
 # Gradual increase in number of samples
 n_samples_leap = 0
@@ -22,7 +23,7 @@ n_samples_leap = 0
 # sb: Strengthened Benders' cuts
 # l: Lagrangian cuts
 # If starting cut mode is 'l', then it will not be changed throughout the algorithm
-init_cut_mode = "l"
+init_cut_mode = CutModes.LAGRANGIAN
 init_n_samples = 1
 
 # Logger
@@ -31,8 +32,11 @@ log_dir = log_manager.create_log_dir("log")
 
 
 # Execution
-algo = sddipclassic.SddipAlgorithm(
-    test_case, log_dir, method="bm", cut_mode=init_cut_mode
+algo = sddipclassical.Algorithm(
+    test_case,
+    log_dir,
+    dual_solver_method=DualSolverMethods.BUNDLE_METHOD,
+    cut_mode=init_cut_mode,
 )
 algo.n_binaries = init_n_binaries
 if init_n_samples:
@@ -55,7 +59,7 @@ finally:
         algo.ps_storage.export_results(results_dir)
         algo.ds_storage.export_results(results_dir)
         algo.dual_solver_storage.export_results(results_dir)
-        if init_cut_mode == "l":
+        if init_cut_mode == CutModes.LAGRANGIAN:
             algo.cc_storage.export_results(results_dir)
         else:
             algo.bc_storage.export_results(results_dir)

@@ -1,3 +1,0 @@
-type	startup	shutdown	n	c2	c1	c0
-2	5	5	3	0.110	5	0
-2	5	5	3	0.085	1.2	0

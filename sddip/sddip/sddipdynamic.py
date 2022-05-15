@@ -28,6 +28,8 @@ class Algorithm:
     def __init__(
         self,
         test_case: str,
+        n_stages:int,
+        n_realizations:int,
         log_dir: str,
         dual_solver_method: DualSolverMethods = DualSolverMethods.BUNDLE_METHOD,
         cut_mode: CutModes = CutModes.LAGRANGIAN,
@@ -36,7 +38,7 @@ class Algorithm:
         self.runtime_logger = logger.RuntimeLogger(log_dir)
 
         # Problem specific parameters
-        self.problem_params = parameters.Parameters(test_case)
+        self.problem_params = parameters.Parameters(test_case, n_stages, n_realizations)
 
         # Algorithm paramters
         self.max_n_samples = 3
@@ -455,6 +457,7 @@ class Algorithm:
                     )
 
                     objective_terms = uc_bw.objective_terms
+                    # print(objective_terms)
                     relaxed_terms = uc_bw.relaxed_terms
 
                     uc_bw.disable_output()
@@ -470,23 +473,23 @@ class Algorithm:
                         + soc_binary_trial_point
                     )
 
-                    model, sg_results = self.dual_solver.solve(
+                    _, dual_results = self.dual_solver.solve(
                         uc_bw.model, objective_terms, relaxed_terms,
                     )
-                    dual_multipliers = sg_results.multipliers.tolist()
-                    dual_value = sg_results.obj_value - np.array(dual_multipliers).dot(
-                        binary_trial_point
-                    )
+                    dual_multipliers = dual_results.multipliers.tolist()
+                    dual_value = dual_results.obj_value - np.array(
+                        dual_multipliers
+                    ).dot(binary_trial_point)
 
                     # Dual value and multiplier for each realization
                     ds_dict[ResultKeys.dv_key].append(dual_value)
                     ds_dict[ResultKeys.dm_key].append(dual_multipliers)
 
                     dual_solver_dict[ResultKeys.ds_iterations].append(
-                        sg_results.n_iterations
+                        dual_results.n_iterations
                     )
                     dual_solver_dict[ResultKeys.ds_solver_time].append(
-                        sg_results.solver_time
+                        dual_results.solver_time
                     )
 
                 self.ds_storage.add_result(i, k, t, ds_dict)
@@ -657,7 +660,10 @@ class Algorithm:
 
         # Value of stage t objective function
         v_lower = uc_fw.model.getObjective().getValue()
-
+        # print(f"Delta: {uc_fw.delta.x}")
+        # print(f"Theta: {uc_fw.theta.x}")
+        # if i == 5:
+        #     uc_fw.model.write("model.lp")
         return v_lower
 
     def add_problem_constraints(

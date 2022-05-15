@@ -38,7 +38,7 @@ class ScenarioGenerator:
         reduced_profile = self.reduce_profile(self.h0_profile, self.reduction_factor)
 
         base_profiles = [
-            self.scale_profile(reduced_profile, max_value)
+            self.scale_profile(reduced_profile, max(max_value-10,0))
             for max_value in max_value_targets
         ]
 

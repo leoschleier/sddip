@@ -10,7 +10,9 @@ class Parameters:
     def __init__(
         self,
         test_case_name: str,
-        sub_directory: str = "raw",
+        n_stages: int,
+        n_realizations: int,
+        raw_directory: str = "raw",
         bus_file="bus_data.txt",
         branch_file="branch_data.txt",
         gen_file="gen_data.txt",
@@ -20,20 +22,27 @@ class Parameters:
         storage_file="storage_data.txt",
         scenario_file="scenario_data.txt",
     ):
-        test_data_dir = os.path.join(test_case_name, sub_directory)
-        test_data_dir = os.path.join(config.test_cases_dir, test_data_dir)
+        raw_data_dir = os.path.join(
+            config.test_cases_dir, test_case_name, raw_directory
+        )
+        scenario_str = f"t{str(n_stages).zfill(2)}_n{str(n_realizations).zfill(2)}"
+        scenario_data_dir = os.path.join(
+            config.test_cases_dir, test_case_name, scenario_str
+        )
 
-        data_importer = DataImporter(test_data_dir)
+        raw_data_importer = DataImporter(raw_data_dir)
+        scenario_data_importer = DataImporter(scenario_data_dir)
 
         # DataFrames
-        self.bus_df = data_importer.dataframe_from_csv(bus_file)
-        self.branch_df = data_importer.dataframe_from_csv(branch_file)
-        self.gen_df = data_importer.dataframe_from_csv(gen_file)
-        self.gen_cost_df = data_importer.dataframe_from_csv(gen_cost_file)
-        self.gen_sup_df = data_importer.dataframe_from_csv(gen_sup_file)
-        self.ren_df = data_importer.dataframe_from_csv(renewables_file)
-        self.storage_df = data_importer.dataframe_from_csv(storage_file)
-        self.scenario_df = data_importer.dataframe_from_csv(scenario_file)
+        self.bus_df = raw_data_importer.dataframe_from_csv(bus_file)
+        self.branch_df = raw_data_importer.dataframe_from_csv(branch_file)
+        self.gen_df = raw_data_importer.dataframe_from_csv(gen_file)
+        self.gen_cost_df = raw_data_importer.dataframe_from_csv(gen_cost_file)
+        self.ren_df = raw_data_importer.dataframe_from_csv(renewables_file)
+        self.storage_df = raw_data_importer.dataframe_from_csv(storage_file)
+
+        self.gen_sup_df = scenario_data_importer.dataframe_from_csv(gen_sup_file)
+        self.scenario_df = scenario_data_importer.dataframe_from_csv(scenario_file)
 
         # Structural data
         self.ptdf = None
@@ -110,11 +119,12 @@ class Parameters:
         nodes = self.bus_df.bus_i.values.tolist()
         edges = self.branch_df[["fbus", "tbus"]].values.tolist()
 
-        graph = utils.Graph(nodes, edges)
-
         ref_bus = self.bus_df.loc[self.bus_df.type == 3].bus_i.values[0]
 
+        graph = utils.Graph(nodes, edges)
+
         self.incidence_matrix = graph.incidence_matrix()
+
         b_l = (
             -self.branch_df.x / (self.branch_df.r ** 2 + self.branch_df.x ** 2)
         ).tolist()
@@ -130,7 +140,7 @@ class Parameters:
         ptdf = m1.dot(np.linalg.inv(m2))
 
         self.ptdf = np.insert(ptdf, ref_bus - 1, 0, axis=1)
-
+        self.ptdf[abs(self.ptdf) < 10 ** -10] = 0
         self.n_lines, self.n_buses = self.ptdf.shape
 
     def _init_deterministic_parameters(self):
@@ -161,7 +171,7 @@ class Parameters:
         self.eff_dc = self.storage_df["Effdc"].values.tolist()
 
         # TODO Adjust penalty for slack variables
-        self.penalty = 1000
+        self.penalty = 100
 
         self.cost_coeffs = (
             self.gc.tolist()

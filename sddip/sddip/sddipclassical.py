@@ -28,6 +28,8 @@ class Algorithm:
     def __init__(
         self,
         test_case: str,
+        n_stages: int,
+        n_realizations: int,
         log_dir: str,
         dual_solver_method: DualSolverMethods = DualSolverMethods.BUNDLE_METHOD,
         cut_mode: CutModes = CutModes.LAGRANGIAN,
@@ -36,7 +38,7 @@ class Algorithm:
         self.runtime_logger = logger.RuntimeLogger(log_dir)
 
         # Problem specific parameters
-        self.problem_params = parameters.Parameters(test_case)
+        self.problem_params = parameters.Parameters(test_case, n_stages, n_realizations)
 
         # Algorithm paramters
         self.max_n_samples = 3
@@ -440,7 +442,7 @@ class Algorithm:
                 dual_solver_dict = self.dual_solver_storage.create_empty_result_dict()
 
                 for n in range(n_realizations):
-                    # Get mixed_integer trial points
+                    # Get binary trial points
                     y_binary_trial_point = self.ps_storage.get_result(i - 1, k, t - 1)[
                         ResultKeys.y_key
                     ]
@@ -511,7 +513,7 @@ class Algorithm:
                         + soc_binary_trial_point
                     )
 
-                    model, sg_results = self.dual_solver.solve(
+                    _, sg_results = self.dual_solver.solve(
                         uc_bw.model, objective_terms, relaxed_terms,
                     )
                     dual_multipliers = sg_results.multipliers.tolist()

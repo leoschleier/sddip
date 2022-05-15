@@ -6,6 +6,8 @@ from sddip import parameters, tree, logger
 def main():
 
     test_case_name = "case30"
+    n_stages = 12
+    n_realizations = 6
 
     log_manager = logger.LogManager()
     log_dir = log_manager.create_log_dir(f"{test_case_name}_ext")
@@ -15,7 +17,7 @@ def main():
 
     print("Building the model...")
 
-    params = parameters.Parameters(test_case_name)
+    params = parameters.Parameters(test_case_name, n_stages, n_realizations)
 
     scenario_tree_construction_start_time = time()
     scenario_tree = tree.ScenarioTree(params.n_realizations_per_stage)

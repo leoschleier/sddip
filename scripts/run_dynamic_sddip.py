@@ -5,17 +5,17 @@ from sddip import logger, sddipdynamic, storage
 
 def main():
     # Parameters
-    test_case = "case30"
-    n_stages = 12
-    n_realizations = 6
+    test_case = "case6ww"
+    n_stages = 6
+    n_realizations = 3
 
-    n_iterations = 5
+    n_iterations = 100
     time_limit_minutes = 3 * 60
 
     # Number of iterations after an unchanging
     # lower bound is considered stabilized
     stop_stabilization_count = 50
-    refinement_stabilization_count = 1
+    refinement_stabilization_count = 5
 
     init_n_binaries = 5
 
@@ -27,13 +27,13 @@ def main():
     # sb: Strengthened Benders' cuts
     # l: Lagrangian cuts
     # If starting cut mode is 'l', then it will not be changed throughout the algorithm
-    init_cut_mode = CutModes.LAGRANGIAN
-    init_n_samples = 1
+    init_cut_mode = CutModes.STRENGTHENED_BENDERS
+    init_n_samples = 3
 
     # Note: sos-constraint in the cut projection cannot be used
     # in combination with Benders cuts due to the LP relaxation
     sos = False
-    big_m = 10 ** 4
+    big_m = 10 ** 3
 
     # Logger
     log_manager = logger.LogManager()

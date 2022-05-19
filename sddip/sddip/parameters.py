@@ -150,9 +150,31 @@ class Parameters:
         self.gen_df
         self.branch_df
 
-        self.gc = np.array(self.gen_cost_df.c1)
-        self.suc = np.array(self.gen_cost_df.startup)
-        self.sdc = np.array(self.gen_cost_df.shutdown)
+        gc_positive = np.where(self.gen_cost_df.c1 > 0, self.gen_cost_df.c1, 1)
+        suc_positive = np.where(
+            self.gen_cost_df.startup > 0, self.gen_cost_df.startup, 1
+        )
+        sdc_positive = np.where(
+            self.gen_cost_df.shutdown > 0, self.gen_cost_df.shutdown, 1
+        )
+
+        costs_log10 = np.concatenate(
+            [
+                np.log10(gc_positive),
+                np.log10(suc_positive),
+                np.log10(sdc_positive),
+                np.zeros(1),
+            ]
+        )
+
+        scaling_digits = int(np.max(costs_log10)) + 1
+
+        self.cost_div = 10 ** (max(scaling_digits - 2, 0))
+
+        self.gc = np.array(self.gen_cost_df.c1) / self.cost_div
+        self.suc = np.array(self.gen_cost_df.startup) / self.cost_div
+        self.sdc = np.array(self.gen_cost_df.shutdown) / self.cost_div
+        print(self.suc)
 
         # Storages
         storage_buses = self.storage_df.bus.values.tolist()
@@ -171,7 +193,7 @@ class Parameters:
         self.eff_dc = self.storage_df["Effdc"].values.tolist()
 
         # TODO Adjust penalty for slack variables
-        self.penalty = 100
+        self.penalty = 10 ** 2
 
         self.cost_coeffs = (
             self.gc.tolist()
@@ -179,7 +201,7 @@ class Parameters:
             + self.sdc.tolist()
             + [self.penalty] * 2
         )
-
+        print(self.cost_coeffs)
         self.pg_min = self.gen_df.Pmin.values.tolist()
         self.pg_max = self.gen_df.Pmax.values.tolist()
         self.pl_max = self.branch_df.rateA.values.tolist()

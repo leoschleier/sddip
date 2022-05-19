@@ -5,7 +5,7 @@ from sddip.sddipclassical import CutModes
 
 def main():
     # Parameters
-    test_case = "case14"
+    test_case = "case30"
     n_stages = 12
     n_realizations = 6
 
@@ -17,7 +17,7 @@ def main():
     stop_stabilization_count = 50
     refinement_stabilization_count = 1
 
-    init_n_binaries = 30
+    init_n_binaries = 10
 
     # Gradual increase in number of samples
     n_samples_leap = 0

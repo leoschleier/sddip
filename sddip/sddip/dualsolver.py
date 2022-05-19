@@ -53,10 +53,9 @@ class DualSolver(ABC):
 
         model.update()
 
-        solver_start_time = time()
         model.optimize()
 
-        self.solver_time += time() - solver_start_time
+        self.solver_time += model.Runtime
 
         subgradient = np.array([t.getValue() for t in relaxed_terms])
         opt_value = model.getObjective().getValue()

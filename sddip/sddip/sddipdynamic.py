@@ -28,8 +28,8 @@ class Algorithm:
     def __init__(
         self,
         test_case: str,
-        n_stages:int,
-        n_realizations:int,
+        n_stages: int,
+        n_realizations: int,
         log_dir: str,
         dual_solver_method: DualSolverMethods = DualSolverMethods.BUNDLE_METHOD,
         cut_mode: CutModes = CutModes.LAGRANGIAN,
@@ -72,7 +72,7 @@ class Algorithm:
             )
         elif dual_solver_method == DualSolverMethods.BUNDLE_METHOD:
             self.dual_solver = dualsolver.BundleMethod(
-                ds_max_iterations, 10 ** -1, log_dir
+                ds_max_iterations, 10 ** -3, log_dir
             )
         else:
             raise ValueError(f"Method '{dual_solver_method}' does not exist.")
@@ -158,13 +158,14 @@ class Algorithm:
             backward_pass_start_time = time()
             if self.cut_mode == CutModes.LAGRANGIAN:
                 lagrangian_cut_iterations.append(i)
-                self.backward_pass(i + 1, samples)
                 self.cut_types_added.update([CutModes.LAGRANGIAN])
+                self.backward_pass(i + 1, samples)
+
             elif self.cut_mode in [CutModes.BENDERS, CutModes.STRENGTHENED_BENDERS]:
-                self.backward_benders(i + 1, samples)
                 self.cut_types_added.update(
                     [CutModes.BENDERS, CutModes.STRENGTHENED_BENDERS]
                 )
+                self.backward_benders(i + 1, samples)
             self.runtime_logger.log_task_end(
                 f"backward_pass_i{i+1}", backward_pass_start_time
             )
@@ -662,7 +663,7 @@ class Algorithm:
         v_lower = uc_fw.model.getObjective().getValue()
         # print(f"Delta: {uc_fw.delta.x}")
         # print(f"Theta: {uc_fw.theta.x}")
-        # if i == 5:
+        # if i == 10:
         #     uc_fw.model.write("model.lp")
         return v_lower
 

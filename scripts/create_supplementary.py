@@ -15,7 +15,7 @@ def main():
 
     # Ramp rate
     # (%/100 of rated capacity per unit time)
-    ramp_rate = 0.25
+    ramp_rate = 0.1
     # Min up/-down time
     up_down_factor = 4
 

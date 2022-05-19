@@ -38,7 +38,7 @@ def main():
 
     demand_buses = [b for b in range(n_buses) if demands[b] != 0]
 
-    max_demand_value_targets = [d for d in demands if d != 0]
+    max_demand_value_targets = [2 * d for d in demands if d != 0]
 
     renewables_buses = [b for b in range(n_buses) if re_max_frac[b] != 0]
 

@@ -5,9 +5,9 @@ from sddip import parameters, tree, logger
 
 def main():
 
-    test_case_name = "case30"
-    n_stages = 12
-    n_realizations = 6
+    test_case_name = "case6ww"
+    n_stages = 6
+    n_realizations = 3
 
     log_manager = logger.LogManager()
     log_dir = log_manager.create_log_dir(f"{test_case_name}_ext")

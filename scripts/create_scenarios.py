@@ -7,8 +7,8 @@ from sddip import config
 def main():
     # TODO Select parameters for scenario generation
     test_case = "case30"
-    n_stages = 12
-    n_realizations_per_stage = 6
+    n_stages = 6
+    n_realizations_per_stage = 12
 
     scenario_str = (
         f"t{str(n_stages).zfill(2)}_n{str(n_realizations_per_stage).zfill(2)}"

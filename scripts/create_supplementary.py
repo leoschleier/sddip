@@ -8,8 +8,8 @@ def main():
     # TODO Select parameters for data generation
     test_case = "case30"
 
-    t = 12
-    n = 6
+    t = 6
+    n = 12
 
     scenario_str = f"t{str(t).zfill(2)}_n{str(n).zfill(2)}"
 

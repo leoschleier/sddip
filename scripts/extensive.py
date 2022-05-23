@@ -1,4 +1,9 @@
 import gurobipy as gp
+
+# import sys, os
+
+# sys.path.append(os.path.join(os.path.dirname(sys.path[0]), "sddip"))
+
 from time import time
 from sddip import parameters, tree, logger
 

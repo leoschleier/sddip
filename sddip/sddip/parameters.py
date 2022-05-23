@@ -174,7 +174,6 @@ class Parameters:
         self.gc = np.array(self.gen_cost_df.c1) / self.cost_div
         self.suc = np.array(self.gen_cost_df.startup) / self.cost_div
         self.sdc = np.array(self.gen_cost_df.shutdown) / self.cost_div
-        print(self.suc)
 
         # Storages
         storage_buses = self.storage_df.bus.values.tolist()
@@ -201,7 +200,9 @@ class Parameters:
             + self.sdc.tolist()
             + [self.penalty] * 2
         )
-        print(self.cost_coeffs)
+
+        print(f"Cost coefficients: {self.cost_coeffs}")
+
         self.pg_min = self.gen_df.Pmin.values.tolist()
         self.pg_max = self.gen_df.Pmax.values.tolist()
         self.pl_max = self.branch_df.rateA.values.tolist()

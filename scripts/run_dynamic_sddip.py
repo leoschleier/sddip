@@ -1,13 +1,17 @@
-from sddip.sddipdynamic import CutModes
-from sddip.dualsolver import DualSolverMethods
+# import sys, os
+
+# sys.path.append(os.path.join(os.path.dirname(sys.path[0]), "sddip"))
+
 from sddip import logger, sddipdynamic, storage
+from sddip.dualsolver import DualSolverMethods
+from sddip.sddipdynamic import CutModes
 
 
 def main():
     # Parameters
-    test_case = "case6ww"
+    test_case = "case30"
     n_stages = 6
-    n_realizations = 3
+    n_realizations = 6
 
     n_iterations = 100
     time_limit_minutes = 3 * 60

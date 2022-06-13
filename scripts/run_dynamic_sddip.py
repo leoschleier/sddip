@@ -14,7 +14,7 @@ def main():
     n_realizations = 6
 
     n_iterations = 100
-    time_limit_minutes = 3 * 60
+    time_limit_minutes = 5 * 60
 
     # Number of iterations after an unchanging
     # lower bound is considered stabilized

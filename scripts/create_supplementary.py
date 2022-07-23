@@ -6,10 +6,10 @@ from sddip import config
 
 def main():
     # TODO Select parameters for data generation
-    test_case = "case30"
+    test_case = "case6ww"
 
-    t = 6
-    n = 12
+    t = 12
+    n = 6
 
     scenario_str = f"t{str(t).zfill(2)}_n{str(n).zfill(2)}"
 

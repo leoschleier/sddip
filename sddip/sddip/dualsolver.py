@@ -16,7 +16,9 @@ class DualSolverMethods(Enum):
 
 
 class DualSolver(ABC):
-    def __init__(self, max_iterations: int, tolerance: float, log_dir: str, tag: str):
+    def __init__(
+        self, max_iterations: int, tolerance: float, log_dir: str, tag: str
+    ):
         self.TAG = tag
 
         log_manager = logger.LogManager()
@@ -76,14 +78,18 @@ class DualSolver(ABC):
         method: str = "",
     ):
         print(
-            f"Dual solver finished ({stop_reason}, m: {self.TAG}{method}, i: {iteration}, st: {self.solver_time}, g: {lowest_gradient_magnitude}, lb: {best_lower_bound})"
+            f"Dual solver finished ({stop_reason}, m: {self.TAG}{method}, "
+            f"i: {iteration}, st: {self.solver_time}, "
+            f"g: {lowest_gradient_magnitude}, lb: {best_lower_bound})"
         )
 
     def log_task_start(self):
         self.start_time = time()
 
     def log_task_end(self):
-        self.runtime_logger.log_task_end(f"{self.TAG}_{self.n_calls}", self.start_time)
+        self.runtime_logger.log_task_end(
+            f"{self.TAG}_{self.n_calls}", self.start_time
+        )
 
 
 class SubgradientMethod(DualSolver):
@@ -155,7 +161,9 @@ class SubgradientMethod(DualSolver):
             gradient_magnitude = np.linalg.norm(subgradient, 2)
 
             lowest_gm = (
-                gradient_magnitude if gradient_magnitude < lowest_gm else lowest_gm
+                gradient_magnitude
+                if gradient_magnitude < lowest_gm
+                else lowest_gm
             )
 
             # Update best lower bound and mutlipliers
@@ -176,7 +184,8 @@ class SubgradientMethod(DualSolver):
                     tolerance_reached = True
                     break
 
-            # Reduce step size parameter if lower bound does not improve for 10 iterations
+            # Reduce step size parameter if lower bound does not improve
+            # for 10 iterations
             if no_improvement_counter == self.no_improvement_limit:
                 step_size_parameter = step_size_parameter / 2
                 no_improvement_counter = 0
@@ -215,7 +224,9 @@ class SubgradientMethod(DualSolver):
     ):
 
         step_size = None
-        gradient_magnitude = np.linalg.norm(gradient, 2) if any(gradient) else None
+        gradient_magnitude = (
+            np.linalg.norm(gradient, 2) if any(gradient) else None
+        )
 
         if method == "css":
             # Constant step size
@@ -234,7 +245,9 @@ class SubgradientMethod(DualSolver):
             #     1 - self.smoothing_factor
             # ) * gradient + self.smoothing_factor * smoothed_gradient
 
-            step_size = (opt_value_estimate - function_value) / gradient_magnitude ** 2
+            step_size = (
+                opt_value_estimate - function_value
+            ) / gradient_magnitude ** 2
 
         else:
             raise ValueError("Incompatible arguments")
@@ -260,7 +273,11 @@ class SubgradientMethod(DualSolver):
             print(text)
 
     def print_verbose(
-        self, iteration: int, model: gp.Model, dual_multipliers: list, subgradient: list
+        self,
+        iteration: int,
+        model: gp.Model,
+        dual_multipliers: list,
+        subgradient: list,
     ):
         if self.output_verbose:
             print()
@@ -293,14 +310,46 @@ class SubgradientMethod(DualSolver):
 class BundleMethod(DualSolver):
 
     TAG = "BM"
+    ABS_PREDICTED_ASCENT = "abs"
+    REL_PREDICTED_ASCENT = "rel"
 
-    def __init__(self, max_iterations: int, tolerance: float, log_dir: str):
+    def __init__(
+        self,
+        max_iterations: int,
+        tolerance: float,
+        log_dir: str,
+        predicted_ascent="abs",
+    ):
         super().__init__(max_iterations, tolerance, log_dir, self.TAG)
 
         self.u_init = 1
         self.u_min = 0.1
         self.m_l = 0.3
         self.m_r = 0.7
+        self.predicted_ascent = predicted_ascent
+
+    def _absolute_predicted_ascent(
+        self, current_value: float, new_value: float
+    ):
+        return max(new_value - current_value, 0)
+
+    def _relative_predicted_ascent(
+        self, current_value: float, new_value: float
+    ):
+        return max((new_value - current_value) / current_value, 0)
+
+    def _get_predicted_ascent(self, current_value: float, new_value: float):
+        if self.predicted_ascent == self.ABS_PREDICTED_ASCENT:
+            return self._absolute_predicted_ascent(current_value, new_value)
+        elif self.predicted_ascent == self.REL_PREDICTED_ASCENT:
+            return self._relative_predicted_ascent(current_value, new_value)
+        else:
+            raise ValueError(
+                "Argument predicted_ascent is "
+                f"'{self.predicted_ascent}'. It must either be "
+                f"'{self.ABS_PREDICTED_ASCENT}' or "
+                f"'{self.REL_PREDICTED_ASCENT}'."
+            )
 
     def solve(self, model: gp.Model, objective_terms, relaxed_terms):
 
@@ -355,7 +404,7 @@ class BundleMethod(DualSolver):
             )
 
             # Predicted ascent
-            delta = max(v.x - f_best, 0)
+            delta = self._get_predicted_ascent(f_best, v.x)
 
             # Update lowest known gradient magnitude for logging purposes
             lowest_gm = min(lowest_gm, np.linalg.norm(np.array(subgradient)))
@@ -390,7 +439,9 @@ class BundleMethod(DualSolver):
 
         self.print_method_finished(stop_reason, i + 1, lowest_gm, f_best)
 
-        self.results.set_values(f_best, np.array(x_best), i + 1, self.solver_time)
+        self.results.set_values(
+            f_best, np.array(x_best), i + 1, self.solver_time
+        )
 
         return (model, self.results)
 
@@ -437,7 +488,10 @@ class BundleMethod(DualSolver):
                 + np.array(subgradient).dot(np.array(x_best) - np.array(x_new))
                 - f_best
             )
-            if linearization_error > max(variation_estimate, 10 * delta) and i_u < -3:
+            if (
+                linearization_error > max(variation_estimate, 10 * delta)
+                and i_u < -3
+            ):
                 u = u_int
             u_new = min(u, 10 * u_current)
             i_u = min(i_u - 1, -1) if u_new == u_current else -1
@@ -448,9 +502,14 @@ class BundleMethod(DualSolver):
     def create_subproblem(self, n_dual_multipliers: int):
         subproblem = gp.Model("Subproblem")
         subproblem.setParam("OutputFlag", 0)
-        v = subproblem.addVar(vtype=gp.GRB.CONTINUOUS, lb=-gp.GRB.INFINITY, name="v")
+        v = subproblem.addVar(
+            vtype=gp.GRB.CONTINUOUS, lb=-gp.GRB.INFINITY, name="v"
+        )
         x = subproblem.addVars(
-            n_dual_multipliers, vtype=gp.GRB.CONTINUOUS, lb=-gp.GRB.INFINITY, name="x"
+            n_dual_multipliers,
+            vtype=gp.GRB.CONTINUOUS,
+            lb=-gp.GRB.INFINITY,
+            name="x",
         )
         return subproblem, v, x
 

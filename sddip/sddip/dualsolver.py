@@ -7,7 +7,7 @@ from time import time
 import gurobipy as gp
 import numpy as np
 
-from sddip import logger
+from . import logger
 
 
 class DualSolverMethods(Enum):

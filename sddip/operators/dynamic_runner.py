@@ -2,44 +2,49 @@
 
 # sys.path.append(os.path.join(os.path.dirname(sys.path[0]), "sddip"))
 
-from sddip import logger, sddipclassical, storage
-from sddip.dualsolver import DualSolverMethods
-from sddip.sddipclassical import CutModes
+from ..sddip import logger, sddipdynamic, storage
+from ..sddip.dualsolver import DualSolverMethods
+from ..sddip.sddipdynamic import CutModes
 
 
 def main():
     # Parameters
-    test_case = "case6ww"
-    n_stages = 6
-    n_realizations = 3
+    test_case = "case30"
+    n_stages = 24
+    n_realizations = 6
 
-    n_iterations = 10
-    time_limit_minutes = 3 * 60
+    n_iterations = 100
+    time_limit_minutes = 5 * 60
 
     # Number of iterations after an unchanging
     # lower bound is considered stabilized
     stop_stabilization_count = 50
-    refinement_stabilization_count = 1
+    refinement_stabilization_count = 5
 
-    init_n_binaries = 10
+    init_n_binaries = 5
 
     # Gradual increase in number of samples
     n_samples_leap = 0
 
     # Starting cut mode
-    # b: Benders' cuts
+    # b: Bender's cuts
     # sb: Strengthened Benders' cuts
     # l: Lagrangian cuts
     # If starting cut mode is 'l', then it will not be changed throughout the algorithm
-    init_cut_mode = CutModes.LAGRANGIAN
-    init_n_samples = 1
+    init_cut_mode = CutModes.STRENGTHENED_BENDERS
+    init_n_samples = 3
+
+    # Note: sos-constraint in the cut projection cannot be used
+    # in combination with Benders cuts due to the LP relaxation
+    sos = False
+    big_m = 10 ** 3
 
     # Logger
     log_manager = logger.LogManager()
     log_dir = log_manager.create_log_dir("log")
 
     # Execution
-    algo = sddipclassical.Algorithm(
+    algo = sddipdynamic.Algorithm(
         test_case,
         n_stages,
         n_realizations,
@@ -47,10 +52,12 @@ def main():
         dual_solver_method=DualSolverMethods.BUNDLE_METHOD,
         cut_mode=init_cut_mode,
     )
+    algo.big_m = big_m
     algo.n_binaries = init_n_binaries
     if init_n_samples:
         algo.n_samples = init_n_samples
     algo.n_samples_leap = n_samples_leap
+    algo.sos = sos
     algo.time_limit_minutes = time_limit_minutes
     algo.stop_stabilization_count = stop_stabilization_count
     algo.refinement_stabilization_count = refinement_stabilization_count

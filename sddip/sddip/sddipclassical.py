@@ -5,17 +5,15 @@ import gurobipy as gp
 import numpy as np
 from scipy import linalg, stats
 
-from sddip import (
-    dualsolver,
-    logger,
-    parameters,
-    scenarios,
-    storage,
-    ucmodelclassical,
-    utils,
-)
-from sddip.constants import ResultKeys
-from sddip.dualsolver import DualSolverMethods
+from . import dualsolver
+from . import logger
+from . import parameters
+from . import scenarios
+from . import storage
+from . import ucmodelclassical
+from . import utils
+from .constants import ResultKeys
+from .dualsolver import DualSolverMethods
 
 
 class CutModes(Enum):
@@ -38,7 +36,9 @@ class Algorithm:
         self.runtime_logger = logger.RuntimeLogger(log_dir)
 
         # Problem specific parameters
-        self.problem_params = parameters.Parameters(test_case, n_stages, n_realizations)
+        self.problem_params = parameters.Parameters(
+            test_case, n_stages, n_realizations
+        )
 
         # Algorithm paramters
         self.max_n_samples = 3
@@ -99,7 +99,9 @@ class Algorithm:
             ResultKeys.dual_solver_keys, "dual_solver"
         )
 
-        self.bound_storage = storage.ResultStorage(ResultKeys.bound_keys, "bounds")
+        self.bound_storage = storage.ResultStorage(
+            ResultKeys.bound_keys, "bounds"
+        )
 
     def fixed_binary_approximation(self):
         self.bin_multipliers = {
@@ -123,7 +125,9 @@ class Algorithm:
                 )
             )
 
-            prec = self.binarizer.calc_precision_from_n_binaries(p_max, self.n_binaries)
+            prec = self.binarizer.calc_precision_from_n_binaries(
+                p_max, self.n_binaries
+            )
 
             continuous_variables_approx_error.append(
                 self.binarizer.calc_max_abs_error(prec)
@@ -136,7 +140,8 @@ class Algorithm:
         soc_bin_multipliers = []
         self.soc_0_bin = []
         for s_max, soc_init in zip(
-            self.problem_params.soc_max, self.problem_params.init_soc_trial_point
+            self.problem_params.soc_max,
+            self.problem_params.init_soc_trial_point,
         ):
             soc_bin_multipliers.append(
                 self.binarizer.calc_binary_multipliers_from_n_binaries(
@@ -144,7 +149,9 @@ class Algorithm:
                 )
             )
 
-            prec = self.binarizer.calc_precision_from_n_binaries(s_max, self.n_binaries)
+            prec = self.binarizer.calc_precision_from_n_binaries(
+                s_max, self.n_binaries
+            )
 
             continuous_variables_approx_error.append(
                 self.binarizer.calc_max_abs_error(prec)
@@ -184,7 +191,9 @@ class Algorithm:
             n_samples = self.n_samples
             samples = self.sc_sampler.generate_samples(n_samples)
             print(f"Samples: {samples}")
-            self.runtime_logger.log_task_end(f"sampling_i{i+1}", sampling_start_time)
+            self.runtime_logger.log_task_end(
+                f"sampling_i{i+1}", sampling_start_time
+            )
 
             ########################################
             # Forward pass
@@ -199,7 +208,9 @@ class Algorithm:
             # Statistical upper bound
             ########################################
             upper_bound_start_time = time()
-            v_upper_l, v_upper_r = self.statistical_upper_bound(v_opt_k, n_samples)
+            v_upper_l, v_upper_r = self.statistical_upper_bound(
+                v_opt_k, n_samples
+            )
             print("Statistical upper bound: {} ".format(v_upper_l))
             self.runtime_logger.log_task_end(
                 f"upper_bound_i{i+1}", upper_bound_start_time
@@ -213,7 +224,10 @@ class Algorithm:
                 lagrangian_cut_iterations.append(i)
                 self.backward_pass(i + 1, samples)
                 self.cut_types_added.update([CutModes.LAGRANGIAN])
-            elif self.cut_mode in [CutModes.BENDERS, CutModes.STRENGTHENED_BENDERS]:
+            elif self.cut_mode in [
+                CutModes.BENDERS,
+                CutModes.STRENGTHENED_BENDERS,
+            ]:
                 self.backward_benders(i + 1, samples)
                 self.cut_types_added.update(
                     [CutModes.BENDERS, CutModes.STRENGTHENED_BENDERS]
@@ -256,7 +270,8 @@ class Algorithm:
             # Stop if lower bound stagnates
             stagnation = False
             if (
-                len(lagrangian_cut_iterations) >= (self.stop_stabilization_count + 1)
+                len(lagrangian_cut_iterations)
+                >= (self.stop_stabilization_count + 1)
                 and i > 0
             ):
                 stagnation = (
@@ -328,7 +343,10 @@ class Algorithm:
                 )
 
                 uc_fw.add_sddip_copy_constraints(
-                    x_trial_point, y_trial_point, x_bs_trial_point, soc_trial_point,
+                    x_trial_point,
+                    y_trial_point,
+                    x_bs_trial_point,
+                    soc_trial_point,
                 )
 
                 uc_fw.add_copy_constraints(
@@ -367,9 +385,13 @@ class Algorithm:
                 try:
                     x_kt = [x_g.x for x_g in uc_fw.x]
                     y_kt = [
-                        y_bin.x for y_g in uc_fw.y_bin_states for y_bin in y_g.values()
+                        y_bin.x
+                        for y_g in uc_fw.y_bin_states
+                        for y_bin in y_g.values()
                     ]
-                    x_bs_kt = [[x_bs.x for x_bs in x_bs_g] for x_bs_g in uc_fw.x_bs]
+                    x_bs_kt = [
+                        [x_bs.x for x_bs in x_bs_g] for x_bs_g in uc_fw.x_bs
+                    ]
                     soc_kt = [
                         soc_bin.x
                         for soc_s in uc_fw.soc_bin_states
@@ -411,8 +433,12 @@ class Algorithm:
         v_std = np.std(v_opt_k)
         alpha = 0.05
 
-        v_upper_l = v_mean + stats.norm.ppf(alpha / 2) * v_std / np.sqrt(n_samples)
-        v_uppper_r = v_mean - stats.norm.ppf(alpha / 2) * v_std / np.sqrt(n_samples)
+        v_upper_l = v_mean + stats.norm.ppf(alpha / 2) * v_std / np.sqrt(
+            n_samples
+        )
+        v_uppper_r = v_mean - stats.norm.ppf(alpha / 2) * v_std / np.sqrt(
+            n_samples
+        )
 
         return v_upper_l, v_uppper_r
 
@@ -436,19 +462,23 @@ class Algorithm:
 
         for t in reversed(range(1, self.problem_params.n_stages)):
             for k in range(n_samples):
-                n_realizations = self.problem_params.n_realizations_per_stage[t]
+                n_realizations = self.problem_params.n_realizations_per_stage[
+                    t
+                ]
                 ds_dict = self.ds_storage.create_empty_result_dict()
                 cc_dict = self.cc_storage.create_empty_result_dict()
-                dual_solver_dict = self.dual_solver_storage.create_empty_result_dict()
+                dual_solver_dict = (
+                    self.dual_solver_storage.create_empty_result_dict()
+                )
 
                 for n in range(n_realizations):
                     # Get binary trial points
-                    y_binary_trial_point = self.ps_storage.get_result(i - 1, k, t - 1)[
-                        ResultKeys.y_key
-                    ]
-                    x_binary_trial_point = self.ps_storage.get_result(i - 1, k, t - 1)[
-                        ResultKeys.x_key
-                    ]
+                    y_binary_trial_point = self.ps_storage.get_result(
+                        i - 1, k, t - 1
+                    )[ResultKeys.y_key]
+                    x_binary_trial_point = self.ps_storage.get_result(
+                        i - 1, k, t - 1
+                    )[ResultKeys.x_key]
                     x_bs_binary_trial_point = self.ps_storage.get_result(
                         i - 1, k, t - 1
                     )[ResultKeys.x_bs_key]
@@ -490,7 +520,8 @@ class Algorithm:
                     )
 
                     uc_bw.add_copy_constraints(
-                        y_binary_trial_multipliers, soc_binary_trial_multipliers
+                        y_binary_trial_multipliers,
+                        soc_binary_trial_multipliers,
                     )
 
                     objective_terms = uc_bw.objective_terms
@@ -517,9 +548,9 @@ class Algorithm:
                         uc_bw.model, objective_terms, relaxed_terms,
                     )
                     dual_multipliers = sg_results.multipliers.tolist()
-                    dual_value = sg_results.obj_value - np.array(dual_multipliers).dot(
-                        binary_trial_point
-                    )
+                    dual_value = sg_results.obj_value - np.array(
+                        dual_multipliers
+                    ).dot(binary_trial_point)
 
                     # Dual value and multiplier for each realization
                     ds_dict[ResultKeys.dv_key].append(dual_value)
@@ -556,20 +587,22 @@ class Algorithm:
         n_samples = len(samples)
         for t in reversed(range(1, self.problem_params.n_stages)):
             for k in range(n_samples):
-                n_realizations = self.problem_params.n_realizations_per_stage[t]
-                bc_dict = self.bc_storage.create_empty_result_dict()
-                y_binary_trial_point = self.ps_storage.get_result(i - 1, k, t - 1)[
-                    ResultKeys.y_key
+                n_realizations = self.problem_params.n_realizations_per_stage[
+                    t
                 ]
+                bc_dict = self.bc_storage.create_empty_result_dict()
+                y_binary_trial_point = self.ps_storage.get_result(
+                    i - 1, k, t - 1
+                )[ResultKeys.y_key]
                 x_trial_point = self.ps_storage.get_result(i - 1, k, t - 1)[
                     ResultKeys.x_key
                 ]
                 x_bs_trial_point = self.ps_storage.get_result(i - 1, k, t - 1)[
                     ResultKeys.x_bs_key
                 ]
-                soc_binary_trial_point = self.ps_storage.get_result(i - 1, k, t - 1)[
-                    ResultKeys.soc_key
-                ]
+                soc_binary_trial_point = self.ps_storage.get_result(
+                    i - 1, k, t - 1
+                )[ResultKeys.soc_key]
 
                 trial_point = (
                     x_trial_point
@@ -617,7 +650,8 @@ class Algorithm:
                     )
 
                     uc_fw.add_copy_constraints(
-                        y_binary_trial_multipliers, soc_binary_trial_multipliers
+                        y_binary_trial_multipliers,
+                        soc_binary_trial_multipliers,
                     )
 
                     uc_fw.model.optimize()
@@ -637,7 +671,9 @@ class Algorithm:
                     dual_multipliers.append(dm)
 
                     if self.cut_mode == CutModes.BENDERS:
-                        opt_values.append(uc_fw.model.getObjective().getValue())
+                        opt_values.append(
+                            uc_fw.model.getObjective().getValue()
+                        )
                     elif self.cut_mode == CutModes.STRENGTHENED_BENDERS:
                         dual_model = ucmodelclassical.ClassicalModel(
                             self.problem_params.n_buses,
@@ -649,7 +685,8 @@ class Algorithm:
                             self.problem_params.backsight_periods,
                         )
                         dual_model.binary_approximation(
-                            self.bin_multipliers["y"], self.bin_multipliers["soc"]
+                            self.bin_multipliers["y"],
+                            self.bin_multipliers["soc"],
                         )
                         dual_model: ucmodelclassical.ClassicalModel = self.add_problem_constraints(
                             dual_model, t, n, i
@@ -661,13 +698,20 @@ class Algorithm:
                             soc_binary_trial_point,
                         )
                         dual_model.add_copy_constraints(
-                            y_binary_trial_multipliers, soc_binary_trial_multipliers
+                            y_binary_trial_multipliers,
+                            soc_binary_trial_multipliers,
                         )
 
                         copy_terms = dual_model.relaxed_terms
 
-                        _, dual_value = self.dual_solver.get_subgradient_and_value(
-                            dual_model.model, dual_model.objective_terms, copy_terms, dm
+                        (
+                            _,
+                            dual_value,
+                        ) = self.dual_solver.get_subgradient_and_value(
+                            dual_model.model,
+                            dual_model.objective_terms,
+                            copy_terms,
+                            dm,
                         )
                         opt_values.append(dual_value)
 
@@ -678,7 +722,9 @@ class Algorithm:
 
                 bc_dict[ResultKeys.bc_intercept_key] = v
                 bc_dict[ResultKeys.bc_gradient_key] = pi.tolist()
-                bc_dict[ResultKeys.bc_trial_point_key] = [t for t in trial_point]
+                bc_dict[ResultKeys.bc_trial_point_key] = [
+                    t for t in trial_point
+                ]
 
                 self.bc_storage.add_result(i, k, t - 1, bc_dict)
 
@@ -692,8 +738,12 @@ class Algorithm:
         x_bs_trial_point = self.problem_params.init_x_bs_trial_point
         soc_trial_point = self.soc_0_bin
 
-        y_binary_trial_multipliers = linalg.block_diag(*self.bin_multipliers["y"])
-        soc_binary_trial_multipliers = linalg.block_diag(*self.bin_multipliers["soc"])
+        y_binary_trial_multipliers = linalg.block_diag(
+            *self.bin_multipliers["y"]
+        )
+        soc_binary_trial_multipliers = linalg.block_diag(
+            *self.bin_multipliers["soc"]
+        )
 
         # Create forward model
         uc_fw = ucmodelclassical.ClassicalModel(
@@ -788,13 +838,16 @@ class Algorithm:
 
         if stage < self.problem_params.n_stages - 1 and iteration > 0:
             if CutModes.LAGRANGIAN in self.cut_types_added:
-                lagrangian_coefficients = self.cc_storage.get_stage_result(stage)
+                lagrangian_coefficients = self.cc_storage.get_stage_result(
+                    stage
+                )
                 model_builder.add_cut_constraints(
                     lagrangian_coefficients[ResultKeys.ci_key],
                     lagrangian_coefficients[ResultKeys.cg_key],
                 )
             if bool(
-                self.cut_types_added & {CutModes.BENDERS, CutModes.STRENGTHENED_BENDERS}
+                self.cut_types_added
+                & {CutModes.BENDERS, CutModes.STRENGTHENED_BENDERS}
             ):
                 benders_coefficients = self.bc_storage.get_stage_result(stage)
                 model_builder.add_benders_cuts(

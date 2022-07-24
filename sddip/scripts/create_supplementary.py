@@ -1,7 +1,7 @@
 import os
 import math
 import pandas as pd
-from sddip import config
+from ..sddip import config
 
 
 def main():

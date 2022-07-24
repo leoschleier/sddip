@@ -1,11 +1,11 @@
-from datetime import time
 import os
 
 import numpy as np
 import pandas as pd
 
-from sddip import utils, config
-import time
+from . import config
+from . import utils
+
 
 class Parameters:
     def __init__(
@@ -202,7 +202,6 @@ class Parameters:
             + [self.penalty] * 2
         )
         print(self.cost_coeffs)
-        time.sleep(10)
 
         print(f"Cost coefficients: {self.cost_coeffs}")
 

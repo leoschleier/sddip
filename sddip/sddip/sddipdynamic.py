@@ -30,7 +30,6 @@ class Algorithm:
         n_realizations: int,
         log_dir: str,
         dual_solver: dualsolver.DualSolver,
-        cut_mode: CutModes = CutModes.LAGRANGIAN,
     ):
         # Logger
         self.runtime_logger = logger.RuntimeLogger(log_dir)
@@ -41,9 +40,6 @@ class Algorithm:
         )
 
         # Algorithm paramters
-        self.max_n_samples = 3
-        self.n_samples = self.max_n_samples
-        self.n_samples_leap = 0
         self.n_binaries = 10
         self.error_threshold = 10 ** (-1)
         self.max_n_binaries = 10
@@ -65,8 +61,14 @@ class Algorithm:
 
         self.dual_solver = dual_solver
 
-        self.init_cut_mode = cut_mode
-        self.cut_mode = self.init_cut_mode
+        self.primary_cut_mode = CutModes.STRENGTHENED_BENDERS
+        self.secondary_cut_mode = CutModes.LAGRANGIAN
+        self.current_cut_mode = self.primary_cut_mode
+
+        self.n_samples_primary = 3
+        self.n_samples_secondary = 1
+        self.n_samples = self.n_samples_primary
+
         self.cut_types_added = set()
 
         # Result storage
@@ -105,7 +107,7 @@ class Algorithm:
             self.binary_approximation_refinement(
                 i, lower_bounds, lagrangian_cut_iterations
             )
-            if not self.init_cut_mode == CutModes.LAGRANGIAN:
+            if self.current_cut_mode == self.primary_cut_mode:
                 self.select_cut_mode(i, lower_bounds)
             self.runtime_logger.log_task_end(
                 f"binary_approximation_refinement_i{i+1}",
@@ -148,12 +150,12 @@ class Algorithm:
             # Backward pass
             ########################################
             backward_pass_start_time = time()
-            if self.cut_mode == CutModes.LAGRANGIAN:
+            if self.current_cut_mode == CutModes.LAGRANGIAN:
                 lagrangian_cut_iterations.append(i)
                 self.cut_types_added.update([CutModes.LAGRANGIAN])
                 self.backward_pass(i + 1, samples)
 
-            elif self.cut_mode in [
+            elif self.current_cut_mode in [
                 CutModes.BENDERS,
                 CutModes.STRENGTHENED_BENDERS,
             ]:
@@ -181,11 +183,6 @@ class Algorithm:
             bound_dict[ResultKeys.ub_l_key] = v_upper_l
             bound_dict[ResultKeys.ub_r_key] = v_upper_r
             self.bound_storage.add_result(i, 0, 0, bound_dict)
-
-            # Increase number of samples
-            # TODO Deprecated
-            if self.n_samples < self.max_n_samples:
-                self.n_samples += self.n_samples_leap
 
             ########################################
             # Stopping criteria
@@ -347,7 +344,7 @@ class Algorithm:
             )
             refinement_condition = delta <= self.refinement_tolerance
 
-        if refinement_condition and self.cut_mode == CutModes.LAGRANGIAN:
+        if refinement_condition and self.current_cut_mode == CutModes.LAGRANGIAN:
             print("Refinement performed.")
             self.n_binaries += (
                 1 if self.n_binaries < self.max_n_binaries else 0
@@ -372,12 +369,12 @@ class Algorithm:
             delta = max((lower_bounds[-1] - lower_bounds[-2]), 0)
             no_improvement_condition = delta <= self.no_improvement_tolerance
 
-        if self.cut_mode == CutModes.LAGRANGIAN:
-            self.cut_mode = CutModes.STRENGTHENED_BENDERS
-            self.n_samples = self.max_n_samples
+        if self.current_cut_mode == self.secondary_cut_mode:
+            self.current_cut_mode = self.primary_cut_mode
+            self.n_samples = self.n_samples_primary
         elif no_improvement_condition:
-            self.cut_mode = CutModes.LAGRANGIAN
-            self.n_samples = 1
+            self.current_cut_mode = self.secondary_cut_mode
+            self.n_samples = self.n_samples_secondary
 
     def backward_pass(self, iteration: int, samples: list):
         i = iteration
@@ -610,11 +607,11 @@ class Algorithm:
 
                     dual_multipliers.append(dm)
 
-                    if self.cut_mode == CutModes.BENDERS:
+                    if self.current_cut_mode == CutModes.BENDERS:
                         opt_values.append(
                             uc_fw.model.getObjective().getValue()
                         )
-                    elif self.cut_mode == CutModes.STRENGTHENED_BENDERS:
+                    elif self.current_cut_mode == CutModes.STRENGTHENED_BENDERS:
                         dual_model = ucmodeldynamic.ForwardModelBuilder(
                             self.problem_params.n_buses,
                             self.problem_params.n_lines,

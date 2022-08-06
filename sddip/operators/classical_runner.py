@@ -1,9 +1,4 @@
-# import sys, os
-
-# sys.path.append(os.path.join(os.path.dirname(sys.path[0]), "sddip"))
-
-from ..sddip import logger, sddipclassical, storage, dualsolver
-from ..sddip.dualsolver import DualSolverMethods
+from ..sddip import dualsolver, logger, sddipclassical, storage
 from ..sddip.sddipclassical import CutModes
 
 
@@ -14,7 +9,6 @@ def main():
     n_realizations = 6
 
     init_n_binaries = 15
-
     n_iterations = 100
     time_limit_minutes = 5 * 60
 
@@ -23,17 +17,7 @@ def main():
     stop_stabilization_count = 50
     refinement_stabilization_count = 1
 
-    # Gradual increase in number of samples
-    n_samples_leap = 0
-
-    # Starting cut mode
-    # b: Benders' cuts
-    # sb: Strengthened Benders' cuts
-    # l: Lagrangian cuts
-    # If starting cut mode is 'l', then it will not be changed throughout the algorithm
-    init_cut_mode = CutModes.STRENGTHENED_BENDERS
-    init_n_samples = 3
-
+    # Dual solver
     ds_tolerance = 10 ** -2
     ds_max_iterations = 5000
     dual_solver = dualsolver.BundleMethod(
@@ -44,22 +28,22 @@ def main():
     log_manager = logger.LogManager()
     log_dir = log_manager.create_log_dir("log")
 
-    # Execution
+    # Setup
     algo = sddipclassical.Algorithm(
-        test_case,
-        n_stages,
-        n_realizations,
-        log_dir,
-        dual_solver=dual_solver,
-        cut_mode=init_cut_mode,
+        test_case, n_stages, n_realizations, log_dir, dual_solver=dual_solver,
     )
     algo.n_binaries = init_n_binaries
-    algo.n_samples = init_n_samples
-    algo.n_samples_leap = n_samples_leap
+
+    algo.primary_cut_mode = CutModes.STRENGTHENED_BENDERS
+    algo.n_samples_primary = 3
+    algo.secondary_cut_mode = CutModes.LAGRANGIAN
+    algo.n_samples_secondary = 1
+
     algo.time_limit_minutes = time_limit_minutes
     algo.stop_stabilization_count = stop_stabilization_count
     algo.refinement_stabilization_count = refinement_stabilization_count
 
+    # Execution
     try:
         algo.run(n_iterations)
     except KeyboardInterrupt as e:
@@ -73,11 +57,10 @@ def main():
             algo.ps_storage.export_results(results_dir)
             algo.ds_storage.export_results(results_dir)
             algo.dual_solver_storage.export_results(results_dir)
-            if init_cut_mode == CutModes.LAGRANGIAN:
+            if CutModes.LAGRANGIAN in algo.cut_types_added:
                 algo.cc_storage.export_results(results_dir)
-            else:
+            if algo.cut_types_added - set(CutModes.LAGRANGIAN):
                 algo.bc_storage.export_results(results_dir)
-                algo.cc_storage.export_results(results_dir)
         except ValueError:
             print("Export incomplete.")
 

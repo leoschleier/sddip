@@ -17,16 +17,16 @@ def main():
     stop_stabilization_count = 50
     refinement_stabilization_count = 5
 
+    # Logger
+    log_manager = logger.LogManager()
+    log_dir = log_manager.create_log_dir("log")
+
     # Dual solver
     ds_tolerance = 10 ** -2
     ds_max_iterations = 5000
     dual_solver = dualsolver.BundleMethod(
         ds_max_iterations, ds_tolerance, log_dir
     )
-
-    # Logger
-    log_manager = logger.LogManager()
-    log_dir = log_manager.create_log_dir("log")
 
     # Setup
     algo = sddipdynamic.Algorithm(

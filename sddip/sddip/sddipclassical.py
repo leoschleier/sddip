@@ -71,7 +71,7 @@ class Algorithm:
             )
         elif dual_solver_method == DualSolverMethods.BUNDLE_METHOD:
             self.dual_solver = dualsolver.BundleMethod(
-                ds_max_iterations, 10 ** -1, log_dir
+                ds_max_iterations, 10 ** -2, log_dir,
             )
         else:
             raise ValueError(f"Method '{dual_solver_method}' does not exist.")
@@ -289,7 +289,7 @@ class Algorithm:
         ########################################
         # Final upper bound
         ########################################
-        n_samples = 30
+        n_samples = 150
         samples = self.sc_sampler.generate_samples(n_samples)
         v_opt_k = self.forward_pass(n_iterations, samples)
         v_upper_l, v_upper_r = self.statistical_upper_bound(v_opt_k, n_samples)

@@ -1,6 +1,7 @@
 from typing import Callable, List
 
-from .operators import classical_runner, dynamic_runner, extensive_runner
+from .operators import (classical_runner, dynamic_runner, 
+                        extensive_runner)
 
 
 CLASSICAL_MODE = "classical"

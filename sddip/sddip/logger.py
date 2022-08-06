@@ -38,7 +38,9 @@ class RuntimeLogger:
 
     def log_experiment_end(self):
         self.log_task_end("global_runtime", self.global_start_time)
-        json.dump(self.runtime_dict, open(self.runtime_file_path, "w"), indent=4)
+        json.dump(
+            self.runtime_dict, open(self.runtime_file_path, "w"), indent=4
+        )
 
 
 class GurobiLogger:
@@ -47,8 +49,12 @@ class GurobiLogger:
         os.mkdir(self.gurobi_log_dir)
 
     def log_model(self, model: gp.Model, label: str):
-        model_file_path = os.path.join(self.gurobi_log_dir, f"{label}_model.lp")
-        solution_file_path = os.path.join(self.gurobi_log_dir, f"{label}_model.sol")
+        model_file_path = os.path.join(
+            self.gurobi_log_dir, f"{label}_model.lp"
+        )
+        solution_file_path = os.path.join(
+            self.gurobi_log_dir, f"{label}_model.sol"
+        )
 
         model.write(model_file_path)
         model.write(solution_file_path)

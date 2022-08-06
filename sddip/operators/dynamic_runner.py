@@ -10,7 +10,7 @@ from ..sddip.sddipdynamic import CutModes
 def main():
     # Parameters
     test_case = "case30"
-    n_stages = 24
+    n_stages = 12
     n_realizations = 6
 
     n_iterations = 100

@@ -9,19 +9,19 @@ from ..sddip.sddipclassical import CutModes
 
 def main():
     # Parameters
-    test_case = "case6ww"
-    n_stages = 6
-    n_realizations = 3
+    test_case = "case30"
+    n_stages = 12
+    n_realizations = 6
 
-    n_iterations = 10
-    time_limit_minutes = 3 * 60
+    n_iterations = 100
+    time_limit_minutes = 5 * 60
 
     # Number of iterations after an unchanging
     # lower bound is considered stabilized
     stop_stabilization_count = 50
     refinement_stabilization_count = 1
 
-    init_n_binaries = 10
+    init_n_binaries = 15
 
     # Gradual increase in number of samples
     n_samples_leap = 0
@@ -31,8 +31,8 @@ def main():
     # sb: Strengthened Benders' cuts
     # l: Lagrangian cuts
     # If starting cut mode is 'l', then it will not be changed throughout the algorithm
-    init_cut_mode = CutModes.LAGRANGIAN
-    init_n_samples = 1
+    init_cut_mode = CutModes.STRENGTHENED_BENDERS
+    init_n_samples = 3
 
     # Logger
     log_manager = logger.LogManager()

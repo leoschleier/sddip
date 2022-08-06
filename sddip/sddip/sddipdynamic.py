@@ -72,7 +72,7 @@ class Algorithm:
             )
         elif dual_solver_method == DualSolverMethods.BUNDLE_METHOD:
             self.dual_solver = dualsolver.BundleMethod(
-                ds_max_iterations, 10 ** -3, log_dir
+                ds_max_iterations, 10 ** -1, log_dir
             )
         else:
             raise ValueError(f"Method '{dual_solver_method}' does not exist.")

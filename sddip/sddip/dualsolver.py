@@ -326,7 +326,18 @@ class BundleMethod(DualSolver):
         self.u_min = 0.1
         self.m_l = 0.3
         self.m_r = 0.7
-        self.predicted_ascent = predicted_ascent
+
+        if predicted_ascent == self.ABS_PREDICTED_ASCENT:
+            self._get_predicted_ascent = self._absolute_predicted_ascent
+        elif predicted_ascent == self.REL_PREDICTED_ASCENT:
+            self._get_predicted_ascent = self._relative_predicted_ascent
+        else:
+            raise ValueError(
+                "Argument predicted_ascent is "
+                f"'{self.predicted_ascent}'. It must either be "
+                f"'{self.ABS_PREDICTED_ASCENT}' or "
+                f"'{self.REL_PREDICTED_ASCENT}'."
+            )
 
     def _absolute_predicted_ascent(
         self, current_value: float, new_value: float
@@ -337,19 +348,6 @@ class BundleMethod(DualSolver):
         self, current_value: float, new_value: float
     ):
         return max((new_value - current_value) / current_value, 0)
-
-    def _get_predicted_ascent(self, current_value: float, new_value: float):
-        if self.predicted_ascent == self.ABS_PREDICTED_ASCENT:
-            return self._absolute_predicted_ascent(current_value, new_value)
-        elif self.predicted_ascent == self.REL_PREDICTED_ASCENT:
-            return self._relative_predicted_ascent(current_value, new_value)
-        else:
-            raise ValueError(
-                "Argument predicted_ascent is "
-                f"'{self.predicted_ascent}'. It must either be "
-                f"'{self.ABS_PREDICTED_ASCENT}' or "
-                f"'{self.REL_PREDICTED_ASCENT}'."
-            )
 
     def solve(self, model: gp.Model, objective_terms, relaxed_terms):
 
@@ -404,6 +402,7 @@ class BundleMethod(DualSolver):
             )
 
             # Predicted ascent
+            # delta = max(v.x - f_best, 0)
             delta = self._get_predicted_ascent(f_best, v.x)
 
             # Update lowest known gradient magnitude for logging purposes

@@ -70,16 +70,22 @@ def main():
                 )
             for s in range(params.n_storages):
                 ys_charge[t, n, s] = model.addVar(
-                    vtype=gp.GRB.CONTINUOUS, lb=0, name=f"ys_c_{t+1}_{n+1}_{s+1}"
+                    vtype=gp.GRB.CONTINUOUS,
+                    lb=0,
+                    name=f"ys_c_{t+1}_{n+1}_{s+1}",
                 )
                 ys_discharge[t, n, s] = model.addVar(
-                    vtype=gp.GRB.CONTINUOUS, lb=0, name=f"ys_dc_{t+1}_{n+1}_{s+1}"
+                    vtype=gp.GRB.CONTINUOUS,
+                    lb=0,
+                    name=f"ys_dc_{t+1}_{n+1}_{s+1}",
                 )
                 u[t, n, s] = model.addVar(
                     vtype=gp.GRB.BINARY, name=f"u_{t+1}_{n+1}_{s+1}"
                 )
                 soc[t, n, s] = model.addVar(
-                    vtype=gp.GRB.CONTINUOUS, lb=0, name=f"soc_{t+1}_{n+1}_{s+1}"
+                    vtype=gp.GRB.CONTINUOUS,
+                    lb=0,
+                    name=f"soc_{t+1}_{n+1}_{s+1}",
                 )
                 socs_p[t, n, s] = model.addVar(
                     vtype=gp.GRB.CONTINUOUS, lb=0, name=f"socs_p_{n+1}_{s+1}"
@@ -332,14 +338,16 @@ def main():
             a_n = node.parent.index
             model.addConstrs(
                 (
-                    x[t, n, g] - x[t - 1, a_n, g] <= s_up[t, n, g] + delta[t, n]
+                    x[t, n, g] - x[t - 1, a_n, g]
+                    <= s_up[t, n, g] + delta[t, n]
                     for g in range(params.n_gens)
                 ),
                 "startup",
             )
             model.addConstrs(
                 (
-                    x[t - 1, a_n, g] - x[t, n, g] <= s_down[t, n, g] + delta[t, n]
+                    x[t - 1, a_n, g] - x[t, n, g]
+                    <= s_down[t, n, g] + delta[t, n]
                     for g in range(params.n_gens)
                 ),
                 "shutdown",
@@ -353,7 +361,9 @@ def main():
     model.addConstrs(
         (
             y[0, 0, g] - y_init[g]
-            <= params.r_up[g] * x_init[g] + params.r_su[g] * s_up[0, 0, g] + delta[0, 0]
+            <= params.r_up[g] * x_init[g]
+            + params.r_su[g] * s_up[0, 0, g]
+            + delta[0, 0]
             for g in range(params.n_gens)
         ),
         "rate-up",
@@ -417,7 +427,8 @@ def main():
                 model.addConstr(
                     (
                         gp.quicksum(x[m.stage, m.index, g] for m in ancestors)
-                        >= params.min_up_time[g] * s_down[t, n, g] - delta[t, n]
+                        >= params.min_up_time[g] * s_down[t, n, g]
+                        - delta[t, n]
                     ),
                     "min-uptime",
                 )
@@ -428,7 +439,9 @@ def main():
                 ancestors = node.get_ancestors()
                 model.addConstr(
                     (
-                        gp.quicksum((1 - x[m.stage, m.index, g]) for m in ancestors)
+                        gp.quicksum(
+                            (1 - x[m.stage, m.index, g]) for m in ancestors
+                        )
                         >= t * s_up[t, n, g] - delta[t, n]
                     ),
                     "min-downtime",
@@ -440,8 +453,11 @@ def main():
                 ancestors = node.get_ancestors(params.min_down_time[g])
                 model.addConstr(
                     (
-                        gp.quicksum((1 - x[m.stage, m.index, g]) for m in ancestors)
-                        >= params.min_down_time[g] * s_up[t, n, g] - delta[t, n]
+                        gp.quicksum(
+                            (1 - x[m.stage, m.index, g]) for m in ancestors
+                        )
+                        >= params.min_down_time[g] * s_up[t, n, g]
+                        - delta[t, n]
                     ),
                     "min-downtime",
                 )

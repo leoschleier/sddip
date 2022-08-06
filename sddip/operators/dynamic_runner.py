@@ -2,7 +2,7 @@
 
 # sys.path.append(os.path.join(os.path.dirname(sys.path[0]), "sddip"))
 
-from ..sddip import logger, sddipdynamic, storage
+from ..sddip import logger, sddipdynamic, storage, dualsolver
 from ..sddip.dualsolver import DualSolverMethods
 from ..sddip.sddipdynamic import CutModes
 
@@ -13,6 +13,8 @@ def main():
     n_stages = 12
     n_realizations = 6
 
+    init_n_binaries = 5
+
     n_iterations = 100
     time_limit_minutes = 5 * 60
 
@@ -21,8 +23,6 @@ def main():
     stop_stabilization_count = 50
     refinement_stabilization_count = 5
 
-    init_n_binaries = 5
-
     # Gradual increase in number of samples
     n_samples_leap = 0
 
@@ -30,9 +30,16 @@ def main():
     # b: Bender's cuts
     # sb: Strengthened Benders' cuts
     # l: Lagrangian cuts
-    # If starting cut mode is 'l', then it will not be changed throughout the algorithm
+    # If starting cut mode is 'l', then it will not be changed
+    # throughout the algorithm
     init_cut_mode = CutModes.STRENGTHENED_BENDERS
     init_n_samples = 3
+
+    ds_tolerance = 10 ** -2
+    ds_max_iterations = 5000
+    dual_solver = dualsolver.BundleMethod(
+        ds_max_iterations, ds_tolerance, log_dir
+    )
 
     # Note: sos-constraint in the cut projection cannot be used
     # in combination with Benders cuts due to the LP relaxation
@@ -49,13 +56,12 @@ def main():
         n_stages,
         n_realizations,
         log_dir,
-        dual_solver_method=DualSolverMethods.BUNDLE_METHOD,
+        dual_solver=dual_solver,
         cut_mode=init_cut_mode,
     )
     algo.big_m = big_m
     algo.n_binaries = init_n_binaries
-    if init_n_samples:
-        algo.n_samples = init_n_samples
+    algo.n_samples = init_n_samples
     algo.n_samples_leap = n_samples_leap
     algo.sos = sos
     algo.time_limit_minutes = time_limit_minutes

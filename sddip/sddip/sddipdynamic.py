@@ -29,7 +29,7 @@ class Algorithm:
         n_stages: int,
         n_realizations: int,
         log_dir: str,
-        dual_solver_method: DualSolverMethods = DualSolverMethods.BUNDLE_METHOD,
+        dual_solver: dualsolver.DualSolver,
         cut_mode: CutModes = CutModes.LAGRANGIAN,
     ):
         # Logger
@@ -63,25 +63,11 @@ class Algorithm:
             self.problem_params.n_realizations_per_stage[1],
         )
 
-        ds_max_iterations = 5000
-
-        self.dual_solver = None
-        if dual_solver_method == DualSolverMethods.SUBGRADIENT_METHOD:
-            self.dual_solver = dualsolver.SubgradientMethod(
-                ds_max_iterations, 10 ** -3, log_dir
-            )
-        elif dual_solver_method == DualSolverMethods.BUNDLE_METHOD:
-            self.dual_solver = dualsolver.BundleMethod(
-                ds_max_iterations, 10 ** -1, log_dir
-            )
-        else:
-            raise ValueError(f"Method '{dual_solver_method}' does not exist.")
+        self.dual_solver = dual_solver
 
         self.init_cut_mode = cut_mode
         self.cut_mode = self.init_cut_mode
         self.cut_types_added = set()
-
-        self.dual_solver.log_flag = False
 
         # Result storage
         self.ps_storage = storage.ResultStorage(
@@ -99,7 +85,6 @@ class Algorithm:
         self.dual_solver_storage = storage.ResultStorage(
             ResultKeys.dual_solver_keys, "dual_solver"
         )
-
         self.bound_storage = storage.ResultStorage(
             ResultKeys.bound_keys, "bounds"
         )

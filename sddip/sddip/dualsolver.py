@@ -108,6 +108,7 @@ class SubgradientMethod(DualSolver):
         self.step_size_parameter = 2
         self.no_improvement_limit = 10
         self.smoothing_factor = 0.25
+        self.log_flag = False
 
     def solve(
         self,

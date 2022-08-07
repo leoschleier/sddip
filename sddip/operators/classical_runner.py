@@ -59,7 +59,7 @@ def main():
             algo.dual_solver_storage.export_results(results_dir)
             if CutModes.LAGRANGIAN in algo.cut_types_added:
                 algo.cc_storage.export_results(results_dir)
-            if algo.cut_types_added - set(CutModes.LAGRANGIAN):
+            if algo.cut_types_added - set([CutModes.LAGRANGIAN]):
                 algo.bc_storage.export_results(results_dir)
         except ValueError:
             print("Export incomplete.")

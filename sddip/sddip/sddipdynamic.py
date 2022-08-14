@@ -107,8 +107,7 @@ class Algorithm:
             self.binary_approximation_refinement(
                 i, lower_bounds, lagrangian_cut_iterations
             )
-            if self.current_cut_mode == self.primary_cut_mode:
-                self.select_cut_mode(i, lower_bounds)
+            self.select_cut_mode(i, lower_bounds)
             self.runtime_logger.log_task_end(
                 f"binary_approximation_refinement_i{i+1}",
                 refinement_start_time,
@@ -344,7 +343,10 @@ class Algorithm:
             )
             refinement_condition = delta <= self.refinement_tolerance
 
-        if refinement_condition and self.current_cut_mode == CutModes.LAGRANGIAN:
+        if (
+            refinement_condition
+            and self.current_cut_mode == CutModes.LAGRANGIAN
+        ):
             print("Refinement performed.")
             self.n_binaries += (
                 1 if self.n_binaries < self.max_n_binaries else 0
@@ -611,7 +613,9 @@ class Algorithm:
                         opt_values.append(
                             uc_fw.model.getObjective().getValue()
                         )
-                    elif self.current_cut_mode == CutModes.STRENGTHENED_BENDERS:
+                    elif (
+                        self.current_cut_mode == CutModes.STRENGTHENED_BENDERS
+                    ):
                         dual_model = ucmodeldynamic.ForwardModelBuilder(
                             self.problem_params.n_buses,
                             self.problem_params.n_lines,

@@ -169,8 +169,7 @@ class Algorithm:
             ########################################
             # Cut mode selection
             ########################################
-            if self.current_cut_mode == self.primary_cut_mode:
-                self.select_cut_mode(i, lower_bounds)
+            self.select_cut_mode(i, lower_bounds)
 
             ########################################
             # Sampling
@@ -657,7 +656,9 @@ class Algorithm:
                         opt_values.append(
                             uc_fw.model.getObjective().getValue()
                         )
-                    elif self.current_cut_mode == CutModes.STRENGTHENED_BENDERS:
+                    elif (
+                        self.current_cut_mode == CutModes.STRENGTHENED_BENDERS
+                    ):
                         dual_model = ucmodelclassical.ClassicalModel(
                             self.problem_params.n_buses,
                             self.problem_params.n_lines,

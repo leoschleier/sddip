@@ -4,11 +4,11 @@ from ..sddip.sddipclassical import CutModes
 
 def main():
     # Parameters
-    test_case = "case30"
+    test_case = "case6ww"
     n_stages = 12
     n_realizations = 6
 
-    init_n_binaries = 15
+    init_n_binaries = 10
     n_iterations = 100
     time_limit_minutes = 5 * 60
 
@@ -23,7 +23,7 @@ def main():
 
     # Dual solver
     ds_tolerance = 10 ** -2
-    ds_max_iterations = 5000
+    ds_max_iterations = 500
     dual_solver = dualsolver.BundleMethod(
         ds_max_iterations, ds_tolerance, log_dir
     )

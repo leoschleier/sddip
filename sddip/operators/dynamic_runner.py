@@ -4,7 +4,7 @@ from ..sddip.sddipdynamic import CutModes
 
 def main():
     # Parameters
-    test_case = "case30"
+    test_case = "case6ww"
     n_stages = 12
     n_realizations = 6
 
@@ -22,8 +22,8 @@ def main():
     log_dir = log_manager.create_log_dir("log")
 
     # Dual solver
-    ds_tolerance = 10 ** -2
-    ds_max_iterations = 5000
+    ds_tolerance = 10 ** -3
+    ds_max_iterations = 500
     dual_solver = dualsolver.BundleMethod(
         ds_max_iterations, ds_tolerance, log_dir
     )

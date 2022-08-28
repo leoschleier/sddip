@@ -50,6 +50,7 @@ class Algorithm:
         self.refinement_stabilization_count = 2
         self.big_m = 10 ** 6
         self.time_limit_minutes = 5 * 60
+        self.n_samples_final_ub = 150
 
         # Helper objects
         self.binarizer = utils.Binarizer()
@@ -271,7 +272,7 @@ class Algorithm:
         ########################################
         # Final upper bound
         ########################################
-        n_samples = 150
+        n_samples = self.n_samples_final_ub
         samples = self.sc_sampler.generate_samples(n_samples)
         v_opt_k = self.forward_pass(n_iterations, samples)
         v_upper_l, v_upper_r = self.statistical_upper_bound(v_opt_k, n_samples)

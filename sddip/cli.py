@@ -1,14 +1,18 @@
 from typing import Callable, List
 
 from .operators import classical_runner, dynamic_runner, extensive_runner
-from .scripts import create_scenarios, create_supplementary
-
+from .scripts import (
+    clear_result_directories,
+    create_scenarios,
+    create_supplementary,
+)
 
 CLASSICAL_MODE = "classical"
 DYNAMIC_MODE = "dynamic"
 EXTENSIVE_MODE = "extensive"
 SCENARIO_CREATION = "scenarios"
 SUPPLEMENTARY_CREATION = "supplementary"
+CLEAR_RESULTS = "clean"
 
 
 def main(argv: List[str]):
@@ -28,6 +32,8 @@ def _get_run_func(mode: str) -> Callable:
         return create_scenarios.main
     elif mode == SUPPLEMENTARY_CREATION:
         return create_supplementary.main
+    elif mode == CLEAR_RESULTS:
+        return clear_result_directories.main
     else:
         raise ValueError("No such mode.")
 

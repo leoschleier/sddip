@@ -8,14 +8,14 @@ def main():
     # TODO Select parameters for data generation
     test_case = "case6ww"
 
-    t = 12
+    t = 8
     n = 6
 
     scenario_str = f"t{str(t).zfill(2)}_n{str(n).zfill(2)}"
 
     # Ramp rate
     # (%/100 of rated capacity per unit time)
-    ramp_rate = 0.1
+    ramp_rate = 0.2
     # Min up/-down time
     up_down_factor = 4
 
@@ -27,7 +27,9 @@ def main():
 
     gen_file = os.path.join(test_case_raw_dir, "gen_data.txt")
     scenario_file = os.path.join(test_case_scenario_dir, "scenario_data.txt")
-    supplementary_file_path = os.path.join(test_case_scenario_dir, "gen_sup_data.txt")
+    supplementary_file_path = os.path.join(
+        test_case_scenario_dir, "gen_sup_data.txt"
+    )
 
     gen_df = pd.read_csv(gen_file, delimiter="\s+")
     scenario_df = pd.read_csv(scenario_file, delimiter="\s+")
@@ -44,7 +46,7 @@ def main():
     n_stages = scenario_df["t"].max()
     n_restrictive_periods = int(math.ceil(1 / up_down_factor * n_stages))
 
-    min_up_time = [5] * n_gens
+    min_up_time = [2] * n_gens
     min_down_time = min_up_time
 
     # Export results

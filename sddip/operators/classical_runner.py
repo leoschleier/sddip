@@ -9,8 +9,8 @@ def main():
     n_realizations = 6
 
     init_n_binaries = 10
-    n_iterations = 100
-    time_limit_minutes = 5 * 60
+    n_iterations = 1000
+    time_limit_minutes = 24 * 60
 
     # Number of iterations after an unchanging
     # lower bound is considered stabilized
@@ -23,7 +23,7 @@ def main():
 
     # Dual solver
     ds_tolerance = 10 ** -2
-    ds_max_iterations = 500
+    ds_max_iterations = 1000
     dual_solver = dualsolver.BundleMethod(
         ds_max_iterations, ds_tolerance, log_dir
     )

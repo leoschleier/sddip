@@ -11,8 +11,8 @@ from ..sddip import parameters, tree, logger
 def main():
 
     test_case_name = "case6ww"
-    n_stages = 6
-    n_realizations = 3
+    n_stages = 8
+    n_realizations = 6
 
     log_manager = logger.LogManager()
     log_dir = log_manager.create_log_dir(f"{test_case_name}_ext")
@@ -469,8 +469,8 @@ def main():
     ########################################################################################################################
     # Solving procedure
     ########################################################################################################################
-    model.setParam("OutputFlag", 0)
-    model.setParam("TimeLimit", 3 * 60 * 60)
+    model.setParam("OutputFlag", 1)
+    model.setParam("TimeLimit", 5 * 60 * 60)
 
     print("Solving process started...")
     model_solving_start_time = time()
@@ -510,6 +510,7 @@ def main():
     # print(soc[1, 2, 0].x)
 
     print("Solving finished.")
+    print(f"Status: {model.Status}")
     print(f"Optimal value: {obj.getValue()}")
     print(f"Total slack: {total_slack}")
     print(f"MIP gap: {model.MIPGap}")

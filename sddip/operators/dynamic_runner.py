@@ -9,21 +9,21 @@ def main():
     n_realizations = 6
 
     init_n_binaries = 5
-    n_iterations = 100
-    time_limit_minutes = 5 * 60
+    n_iterations = 1000
+    time_limit_minutes = 24 * 60
 
     # Number of iterations after an unchanging
     # lower bound is considered stabilized
     stop_stabilization_count = 50
-    refinement_stabilization_count = 5
+    refinement_stabilization_count = 10
 
     # Logger
     log_manager = logger.LogManager()
     log_dir = log_manager.create_log_dir("log")
 
     # Dual solver
-    ds_tolerance = 10 ** -3
-    ds_max_iterations = 500
+    ds_tolerance = 10 ** -2
+    ds_max_iterations = 1000
     dual_solver = dualsolver.BundleMethod(
         ds_max_iterations, ds_tolerance, log_dir
     )

@@ -7,12 +7,12 @@ from .scripts import (
     create_supplementary,
 )
 
-CLASSICAL_MODE = "classical"
-DYNAMIC_MODE = "dynamic"
-EXTENSIVE_MODE = "extensive"
-SCENARIO_CREATION = "scenarios"
-SUPPLEMENTARY_CREATION = "supplementary"
-CLEAR_RESULTS = "clean"
+CLASSICAL_MODE = "--classical"
+DYNAMIC_MODE = "--dynamic"
+EXTENSIVE_MODE = "--extensive"
+SCENARIO_CREATION = "--scenarios"
+SUPPLEMENTARY_CREATION = "--supplementary"
+CLEAR_RESULTS = "--clean"
 
 
 def main(argv: List[str]):

@@ -5,16 +5,16 @@ from ..sddip.sddipdynamic import CutModes
 def main():
     # Parameters
     test_case = "case6ww"
-    n_stages = 12
+    n_stages = 8
     n_realizations = 6
 
     init_n_binaries = 5
     n_iterations = 1000
-    time_limit_minutes = 24 * 60
+    time_limit_minutes = 5 * 60
 
     # Number of iterations after an unchanging
     # lower bound is considered stabilized
-    stop_stabilization_count = 50
+    stop_stabilization_count = 1000
     refinement_stabilization_count = 10
 
     # Logger
@@ -45,6 +45,7 @@ def main():
     algo.time_limit_minutes = time_limit_minutes
     algo.stop_stabilization_count = stop_stabilization_count
     algo.refinement_stabilization_count = refinement_stabilization_count
+    algo.n_samples_final_ub = 150
 
     # Execution
     try:

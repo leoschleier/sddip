@@ -63,12 +63,9 @@ class Algorithm:
 
         self.primary_cut_mode = CutModes.STRENGTHENED_BENDERS
         self.secondary_cut_mode = CutModes.LAGRANGIAN
-        self.init_cut_mode = self.primary_cut_mode
-        self.current_cut_mode = self.init_cut_mode
 
         self.n_samples_primary = 3
         self.n_samples_secondary = 1
-        self.n_samples = self.n_samples_primary
 
         self.cut_types_added = set()
 
@@ -159,6 +156,8 @@ class Algorithm:
         print("#### SDDiP-Algorithm started ####")
         self.runtime_logger.start()
         self.dual_solver.runtime_logger.start()
+        self.current_cut_mode = self.primary_cut_mode
+        self.n_samples = self.n_samples_primary
         lower_bounds = []
         lagrangian_cut_iterations = []
 

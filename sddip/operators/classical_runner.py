@@ -5,11 +5,11 @@ from ..sddip.sddipclassical import CutModes
 def main():
     # Parameters
     test_case = "case6ww"
-    n_stages = 6
+    n_stages = 8
     n_realizations = 6
 
-    init_n_binaries = 5
-    n_iterations = 1000
+    init_n_binaries = 10
+    n_iterations = 10
     time_limit_minutes = 5 * 60
 
     # Number of iterations after an unchanging
@@ -34,8 +34,8 @@ def main():
     )
     algo.n_binaries = init_n_binaries
 
-    algo.primary_cut_mode = CutModes.STRENGTHENED_BENDERS
-    algo.n_samples_primary = 3
+    algo.primary_cut_mode = CutModes.LAGRANGIAN
+    algo.n_samples_primary = 1
     algo.secondary_cut_mode = CutModes.LAGRANGIAN
     algo.n_samples_secondary = 1
 

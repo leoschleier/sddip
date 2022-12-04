@@ -1,60 +1,53 @@
-# import sys, os
-
-# sys.path.append(os.path.join(os.path.dirname(sys.path[0]), "sddip"))
-
-from sddip import logger, sddipclassical, storage
-from sddip.dualsolver import DualSolverMethods
-from sddip.sddipclassical import CutModes
+from ..sddip import logger, sddipdynamic, storage, dualsolver
+from ..sddip.sddipdynamic import CutModes
 
 
 def main():
     # Parameters
     test_case = "case6ww"
-    n_stages = 6
-    n_realizations = 3
+    n_stages = 8
+    n_realizations = 6
 
-    n_iterations = 10
-    time_limit_minutes = 3 * 60
+    init_n_binaries = 6
+    n_iterations = 14
+    time_limit_minutes = 5 * 60
 
     # Number of iterations after an unchanging
     # lower bound is considered stabilized
-    stop_stabilization_count = 50
-    refinement_stabilization_count = 1
-
-    init_n_binaries = 10
-
-    # Gradual increase in number of samples
-    n_samples_leap = 0
-
-    # Starting cut mode
-    # b: Benders' cuts
-    # sb: Strengthened Benders' cuts
-    # l: Lagrangian cuts
-    # If starting cut mode is 'l', then it will not be changed throughout the algorithm
-    init_cut_mode = CutModes.LAGRANGIAN
-    init_n_samples = 1
+    stop_stabilization_count = 1000
+    refinement_stabilization_count = 5
 
     # Logger
     log_manager = logger.LogManager()
     log_dir = log_manager.create_log_dir("log")
 
-    # Execution
-    algo = sddipclassical.Algorithm(
-        test_case,
-        n_stages,
-        n_realizations,
-        log_dir,
-        dual_solver_method=DualSolverMethods.BUNDLE_METHOD,
-        cut_mode=init_cut_mode,
+    # Dual solver
+    ds_tolerance = 10 ** -3
+    ds_max_iterations = 50
+    dual_solver = dualsolver.BundleMethod(
+        ds_max_iterations, ds_tolerance, log_dir
+    )
+
+    # Setup
+    algo = sddipdynamic.Algorithm(
+        test_case, n_stages, n_realizations, log_dir, dual_solver=dual_solver,
     )
     algo.n_binaries = init_n_binaries
-    if init_n_samples:
-        algo.n_samples = init_n_samples
-    algo.n_samples_leap = n_samples_leap
+
+    algo.big_m = 10 ** 3
+    algo.sos = False
+
+    algo.primary_cut_mode = CutModes.STRENGTHENED_BENDERS
+    algo.n_samples_primary = 3
+    algo.secondary_cut_mode = CutModes.LAGRANGIAN
+    algo.n_samples_secondary = 1
+
     algo.time_limit_minutes = time_limit_minutes
     algo.stop_stabilization_count = stop_stabilization_count
     algo.refinement_stabilization_count = refinement_stabilization_count
+    algo.n_samples_final_ub = 150
 
+    # Execution
     try:
         algo.run(n_iterations)
     except KeyboardInterrupt as e:
@@ -68,11 +61,12 @@ def main():
             algo.ps_storage.export_results(results_dir)
             algo.ds_storage.export_results(results_dir)
             algo.dual_solver_storage.export_results(results_dir)
-            if init_cut_mode == CutModes.LAGRANGIAN:
+
+            if CutModes.LAGRANGIAN in algo.cut_types_added:
                 algo.cc_storage.export_results(results_dir)
-            else:
+            if algo.cut_types_added - set([CutModes.LAGRANGIAN]):
                 algo.bc_storage.export_results(results_dir)
-                algo.cc_storage.export_results(results_dir)
+
         except ValueError:
             print("Export incomplete.")
 

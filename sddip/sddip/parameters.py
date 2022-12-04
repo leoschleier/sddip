@@ -3,7 +3,8 @@ import os
 import numpy as np
 import pandas as pd
 
-from sddip import utils, config
+from . import config
+from . import utils
 
 
 class Parameters:
@@ -25,7 +26,9 @@ class Parameters:
         raw_data_dir = os.path.join(
             config.test_cases_dir, test_case_name, raw_directory
         )
-        scenario_str = f"t{str(n_stages).zfill(2)}_n{str(n_realizations).zfill(2)}"
+        scenario_str = (
+            f"t{str(n_stages).zfill(2)}_n{str(n_realizations).zfill(2)}"
+        )
         scenario_data_dir = os.path.join(
             config.test_cases_dir, test_case_name, scenario_str
         )
@@ -41,8 +44,12 @@ class Parameters:
         self.ren_df = raw_data_importer.dataframe_from_csv(renewables_file)
         self.storage_df = raw_data_importer.dataframe_from_csv(storage_file)
 
-        self.gen_sup_df = scenario_data_importer.dataframe_from_csv(gen_sup_file)
-        self.scenario_df = scenario_data_importer.dataframe_from_csv(scenario_file)
+        self.gen_sup_df = scenario_data_importer.dataframe_from_csv(
+            gen_sup_file
+        )
+        self.scenario_df = scenario_data_importer.dataframe_from_csv(
+            scenario_file
+        )
 
         # Structural data
         self.ptdf = None
@@ -241,7 +248,9 @@ class Parameters:
         """
         scenario_df = self.scenario_df
 
-        self.n_realizations_per_stage = scenario_df.groupby("t")["n"].nunique().tolist()
+        self.n_realizations_per_stage = (
+            scenario_df.groupby("t")["n"].nunique().tolist()
+        )
         self.n_stages = len(self.n_realizations_per_stage)
         self.n_scenarios = np.prod(self.n_realizations_per_stage)
 

@@ -3,7 +3,7 @@ import numpy as np
 import pandas as pd
 import random as rdm
 
-from sddip import config
+from . import config
 
 
 class ScenarioGenerator:

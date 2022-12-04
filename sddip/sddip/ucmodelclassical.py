@@ -1,6 +1,6 @@
 import gurobipy as gp
 
-from sddip.ucmodeldynamic import BackwardModelBuilder
+from .ucmodeldynamic import BackwardModelBuilder
 
 
 class ClassicalModel(BackwardModelBuilder):
@@ -39,7 +39,9 @@ class ClassicalModel(BackwardModelBuilder):
         g = 1
         for n_y in n_y_bin_vars:
             self.y_bin_states.append(
-                self.model.addVars(n_y, vtype=var_type, lb=0, ub=1, name=f"y_bin_{g}")
+                self.model.addVars(
+                    n_y, vtype=var_type, lb=0, ub=1, name=f"y_bin_{g}"
+                )
             )
             g += 1
 
@@ -66,7 +68,9 @@ class ClassicalModel(BackwardModelBuilder):
 
         self.model.addConstrs(
             (
-                gp.LinExpr(y_bin_multipliers[g], self.y_bin_states[g].select("*"))
+                gp.LinExpr(
+                    y_bin_multipliers[g], self.y_bin_states[g].select("*")
+                )
                 == self.y[g]
                 for g in range(self.n_generators)
             ),
@@ -75,7 +79,9 @@ class ClassicalModel(BackwardModelBuilder):
 
         self.model.addConstrs(
             (
-                gp.LinExpr(soc_bin_multipliers[s], self.soc_bin_states[s].select("*"))
+                gp.LinExpr(
+                    soc_bin_multipliers[s], self.soc_bin_states[s].select("*")
+                )
                 == self.soc[s]
                 for s in range(self.n_storages)
             ),
@@ -132,7 +138,10 @@ class ClassicalModel(BackwardModelBuilder):
         for intercept, gradient in zip(cut_intercepts, cut_gradients):
             # Cut constraint
             self.model.addConstr(
-                (self.theta >= intercept + gp.LinExpr(gradient, state_variables)),
+                (
+                    self.theta
+                    >= intercept + gp.LinExpr(gradient, state_variables)
+                ),
                 f"cut_{id}",
             )
             id += 1

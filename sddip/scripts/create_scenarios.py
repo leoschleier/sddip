@@ -1,14 +1,14 @@
 import os
 import pandas as pd
-from sddip import scenarios
-from sddip import config
+from ..sddip import scenarios
+from ..sddip import config
 
 
 def main():
     # TODO Select parameters for scenario generation
-    test_case = "case30"
-    n_stages = 6
-    n_realizations_per_stage = 12
+    test_case = "case6ww"
+    n_stages = 8
+    n_realizations_per_stage = 6
 
     scenario_str = (
         f"t{str(n_stages).zfill(2)}_n{str(n_realizations_per_stage).zfill(2)}"
@@ -25,7 +25,9 @@ def main():
 
     bus_file_path = os.path.join(test_case_raw_dir, "bus_data.txt")
     renewables_file_path = os.path.join(test_case_raw_dir, "ren_data.txt")
-    scenario_file_path = os.path.join(test_case_scenario_dir, "scenario_data.txt")
+    scenario_file_path = os.path.join(
+        test_case_scenario_dir, "scenario_data.txt"
+    )
 
     bus_df = pd.read_csv(bus_file_path, delimiter="\s+")
     renewables_df = pd.read_csv(renewables_file_path, delimiter="\s+")
@@ -45,7 +47,9 @@ def main():
     re_base_values = [frac * sum(demands) for frac in re_max_frac if frac != 0]
 
     # Generate scenarios
-    sc_generator = scenarios.ScenarioGenerator(n_stages, n_realizations_per_stage)
+    sc_generator = scenarios.ScenarioGenerator(
+        n_stages, n_realizations_per_stage
+    )
 
     # Demand scenarios
     demand_scenario_df = sc_generator.generate_demand_scenario_dataframe(
@@ -70,7 +74,9 @@ def main():
     )
     renewables_scenario_df.drop(["t", "n", "p"], axis=1, inplace=True)
 
-    scenario_df = pd.concat([demand_scenario_df, renewables_scenario_df], axis=1)
+    scenario_df = pd.concat(
+        [demand_scenario_df, renewables_scenario_df], axis=1
+    )
 
     scenario_df.to_csv(scenario_file_path, sep="\t", index=False)
 

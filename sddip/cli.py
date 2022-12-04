@@ -1,4 +1,5 @@
 from typing import Callable, List
+import argparse
 
 from .operators import classical_runner, dynamic_runner, extensive_runner
 from .scripts import (
@@ -7,33 +8,63 @@ from .scripts import (
     create_supplementary,
 )
 
-CLASSICAL_MODE = "--classical"
-DYNAMIC_MODE = "--dynamic"
-EXTENSIVE_MODE = "--extensive"
-SCENARIO_CREATION = "--scenarios"
-SUPPLEMENTARY_CREATION = "--supplementary"
-CLEAR_RESULTS = "--clean"
-
 
 def main(argv: List[str]):
-    mode = argv[0]
-    run_func = _get_run_func(mode)
+    args = _parse_arguments(argv)
+    run_func = _get_run_func(args)
     run_func()
 
 
-def _get_run_func(mode: str) -> Callable:
-    if mode == CLASSICAL_MODE:
+def _parse_arguments(argv: List[str]) -> argparse.Namespace:
+    """Parse the command line arguments."""
+    parser = _create_argument_parser()
+    args = parser.parse_args(argv[1:])
+    return args
+
+
+def _create_argument_parser() -> argparse.ArgumentParser:
+    """Create an argument parser for the command line interface."""
+
+    parser = argparse.ArgumentParser(description="Dynamic SDDIP")
+
+    parser.add_argument(
+        "--classical", action="store_true", help="Run classical SDDIP"
+    )
+    parser.add_argument(
+        "--dynamic", action="store_true", help="Run dynamic SDDIP"
+    )
+    parser.add_argument(
+        "--extensive",
+        action="store_true",
+        help="Run script to solve the extensive model",
+    )
+    parser.add_argument(
+        "--scenarios", action="store_true", help="Create scenarios"
+    )
+    parser.add_argument(
+        "--supplementary",
+        action="store_true",
+        help="Run script to create supplementary data",
+    )
+    parser.add_argument(
+        "--clean", action="store_true", help="Clean result directories"
+    )
+
+    return parser
+
+
+def _get_run_func(args: argparse.Namespace) -> Callable:
+    if args.classical:
         return classical_runner.main
-    elif mode == DYNAMIC_MODE:
+    elif args.dynamic:
         return dynamic_runner.main
-    elif mode == EXTENSIVE_MODE:
+    elif args.extensive:
         return extensive_runner.main
-    elif mode == SCENARIO_CREATION:
+    elif args.scenarios:
         return create_scenarios.main
-    elif mode == SUPPLEMENTARY_CREATION:
+    elif args.supplementary:
         return create_supplementary.main
-    elif mode == CLEAR_RESULTS:
+    elif args.clean:
         return clear_result_directories.main
     else:
-        raise ValueError("No such mode.")
-
+        raise ValueError("No such execution mode.")

@@ -1,3 +1,4 @@
+import logging
 from typing import Callable, List
 import argparse
 
@@ -9,8 +10,16 @@ from .scripts import (
 )
 
 
+logger = logging.getLogger(__name__)
+
+
 def main(argv: List[str]):
+    """Run the command line interface."""
     args = _parse_arguments(argv)
+
+    _init_logging()
+    logger.info("Executing the SDDIP package.")
+
     run_func = _get_run_func(args)
     run_func()
 
@@ -18,7 +27,7 @@ def main(argv: List[str]):
 def _parse_arguments(argv: List[str]) -> argparse.Namespace:
     """Parse the command line arguments."""
     parser = _create_argument_parser()
-    args = parser.parse_args(argv[1:])
+    args = parser.parse_args(argv)
     return args
 
 
@@ -53,7 +62,17 @@ def _create_argument_parser() -> argparse.ArgumentParser:
     return parser
 
 
+def _init_logging():
+    """Initialize the logging."""
+    logging.basicConfig(
+        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+        level=logging.INFO,
+        handlers=[logging.StreamHandler()],
+    )
+
+
 def _get_run_func(args: argparse.Namespace) -> Callable:
+    """Return the function to run based on the command line arguments."""
     if args.classical:
         return classical_runner.main
     elif args.dynamic:

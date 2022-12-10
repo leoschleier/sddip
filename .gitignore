@@ -129,8 +129,8 @@ dmypy.json
 .pyre/
 
 # Result data
-data/02_solver_log/*
-data/03_solutions/*
+data/02_results/*
+data/03_logs/*
 
 # VSCode
 .vscode

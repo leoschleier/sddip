@@ -1,6 +1,8 @@
 import logging
 from typing import Callable, List
 import argparse
+import datetime as dt
+from . import config
 
 from .operators import classical_runner, dynamic_runner, extensive_runner
 from .scripts import (
@@ -58,16 +60,27 @@ def _create_argument_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--clean", action="store_true", help="Clean result directories"
     )
+    parser.add_argument(
+        "--verbose", action="store_true", help="Enable verbose logging"
+    )
 
     return parser
 
 
-def _init_logging():
+def _init_logging(verbose: bool = False):
     """Initialize the logging."""
+    now_str = dt.datetime.now().strftime("%Y%m%d%H%M%S")
+    log_file = config.LOGS_DIR / f"{now_str}_logs.txt"
+
+    if verbose:
+        log_level = logging.DEBUG
+    else:
+        log_level = logging.INFO
+
     logging.basicConfig(
         format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-        level=logging.INFO,
-        handlers=[logging.StreamHandler()],
+        level=log_level,
+        handlers=[logging.StreamHandler(), logging.FileHandler(log_file)],
     )
 
 
@@ -86,4 +99,4 @@ def _get_run_func(args: argparse.Namespace) -> Callable:
     elif args.clean:
         return clear_result_directories.main
     else:
-        raise ValueError("No such execution mode.")
+        return dynamic_runner.main

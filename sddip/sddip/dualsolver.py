@@ -1,4 +1,5 @@
 import copy
+import logging
 import os
 from abc import ABC, abstractmethod
 from enum import Enum
@@ -8,6 +9,8 @@ import gurobipy as gp
 import numpy as np
 
 from . import logger
+
+logger = logging.getLogger(__name__)
 
 
 class DualSolverMethods(Enum):
@@ -69,7 +72,7 @@ class DualSolver(ABC):
         self.solver_time = 0
         self.log_task_start()
 
-    def print_method_finished(
+    def log_method_finished(
         self,
         stop_reason: str,
         iteration: int,
@@ -77,10 +80,17 @@ class DualSolver(ABC):
         best_lower_bound: float,
         method: str = "",
     ):
-        print(
-            f"Dual solver finished ({stop_reason}, m: {self.TAG}{method}, "
-            f"i: {iteration}, st: {self.solver_time}, "
-            f"g: {lowest_gradient_magnitude}, lb: {best_lower_bound})"
+        logger.info(
+            "Dual solver finished ({sr}, m: {tm}, i: {iter}, st: {st}, "
+            "g: {gm}, lb: {lb})",
+            {
+                "sr": stop_reason,
+                "tm": self.TAG + method,
+                "iter": iteration,
+                "st": self.solver_time,
+                "gm": lowest_gradient_magnitude,
+                "lb": best_lower_bound,
+            },
         )
 
     def log_task_start(self):
@@ -97,7 +107,10 @@ class SubgradientMethod(DualSolver):
     TAG = "SG"
 
     def __init__(
-        self, max_iterations: int, tolerance: float, log_dir: str = None,
+        self,
+        max_iterations: int,
+        tolerance: float,
+        log_dir: str = None,
     ) -> None:
         super().__init__(max_iterations, tolerance, log_dir, self.TAG)
 
@@ -143,7 +156,7 @@ class SubgradientMethod(DualSolver):
 
         tolerance_reached = False
 
-        self.print_info("Subgradient Method started")
+        logger.debug("Subgradient Method started")
 
         for j in range(self.max_iterations):
 
@@ -157,7 +170,7 @@ class SubgradientMethod(DualSolver):
                     model, str(j).zfill(len(str(self.max_iterations)))
                 )
 
-            self.print_verbose(j, model, dual_multipliers, subgradient)
+            self.log_verbose(j, model, dual_multipliers, subgradient)
 
             gradient_magnitude = np.linalg.norm(subgradient, 2)
 
@@ -178,7 +191,7 @@ class SubgradientMethod(DualSolver):
             # Check Stopping criteria
             if gradient_magnitude <= self.tolerance:
                 tolerance_reached = True
-                self.print_iteration_info(j, opt_value, gradient_magnitude)
+                self.log_iteration_info(j, opt_value, gradient_magnitude)
                 break
             if optimal_value_estimate:
                 if abs(optimal_value_estimate - opt_value) <= 10 ** (-8):
@@ -201,11 +214,11 @@ class SubgradientMethod(DualSolver):
             if not j == self.max_iterations - 1:
                 dual_multipliers = dual_multipliers + step_size * subgradient
 
-            self.print_iteration_info(j, opt_value, subgradient, step_size)
+            self.log_iteration_info(j, opt_value, subgradient, step_size)
 
         stop_reason = "Tolerance" if tolerance_reached else "Max iterations"
 
-        self.print_method_finished(
+        self.log_method_finished(
             stop_reason, j + 1, lowest_gm, best_lower_bound, method
         )
 
@@ -248,63 +261,51 @@ class SubgradientMethod(DualSolver):
 
             step_size = (
                 opt_value_estimate - function_value
-            ) / gradient_magnitude ** 2
+            ) / gradient_magnitude**2
 
         else:
             raise ValueError("Incompatible arguments")
 
         return step_size
 
-    def print_iteration_info(
+    def log_iteration_info(
         self,
         iteration: int,
         opt_value: float,
         gradient_magnitude: float,
         step_size: float = None,
     ):
-        info = f"Iteration: {iteration} | Optimal value: {opt_value} | Gradient magnitude: {gradient_magnitude}"
+        logger.info(
+            "Iteration: %s | Optimal value: %s | Gradient magnitude: %s | "
+            "Step size: %s",
+            iteration,
+            opt_value,
+            gradient_magnitude,
+            step_size,
+        )
 
-        if step_size != None:
-            info += f" | Step size: {step_size}"
-
-        self.print_info(info)
-
-    def print_info(self, text: str):
-        if self.output_flag:
-            print(text)
-
-    def print_verbose(
+    def log_verbose(
         self,
         iteration: int,
         model: gp.Model,
         dual_multipliers: list,
         subgradient: list,
     ):
-        if self.output_verbose:
-            print()
-            print(f"Iteration {iteration}:")
-            print("-" * 40)
-            model.setParam("OutputFlag", 1)
 
-            print()
-            print(f"Dual multipliers: {dual_multipliers}")
+        logger.debug("Iteration %s:", iteration)
 
-            print()
-            print("Model:")
-            model.display()
+        logger.debug("Dual multipliers: %s", dual_multipliers)
+        logger.debug("Subgradient: %s", subgradient)
 
-            print()
-            print("Optimal point:")
-            model.printAttr("X")
-
-            print()
-            model.setParam("OutputFlag", 0)
-            print(f"Subgradient: {subgradient}")
-            print()
+        # TODO Log model and optimal point
+        # model.setParam("OutputFlag", 1)
+        # Model model.display()
+        # Optimal point: model.printAttr("X")
+        # model.setParam("OutputFlag", 0)
 
     def create_subgradient_log_dir(self, id: str):
-        dir = os.path.join(self.log_dir, f"{id}_subgradient")
-        os.mkdir(dir)
+        sg_dir = os.path.join(self.log_dir, f"{id}_subgradient")
+        os.mkdir(sg_dir)
         return dir
 
 
@@ -327,6 +328,8 @@ class BundleMethod(DualSolver):
         self.u_min = 0.1
         self.m_l = 0.3
         self.m_r = 0.7
+
+        self.predicted_ascent = predicted_ascent
 
         if predicted_ascent == self.ABS_PREDICTED_ASCENT:
             self._get_predicted_ascent = self._absolute_predicted_ascent
@@ -358,7 +361,7 @@ class BundleMethod(DualSolver):
         tolerance_reached = False
         u = self.u_init
         i_u = 0
-        var_est = 10 ** 8
+        var_est = 10**8
 
         gradient_len = len(relaxed_terms)
         x_new = np.zeros(gradient_len)
@@ -437,7 +440,7 @@ class BundleMethod(DualSolver):
 
         self.log_task_end()
 
-        self.print_method_finished(stop_reason, i + 1, lowest_gm, f_best)
+        self.log_method_finished(stop_reason, i + 1, lowest_gm, f_best)
 
         self.results.set_values(
             f_best, np.array(x_best), i + 1, self.solver_time

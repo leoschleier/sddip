@@ -1,5 +1,8 @@
+import logging
 from ..sddip import dualsolver, logger, sddipclassical, storage
 from ..sddip.sddipclassical import CutModes
+
+logger = logging.getLogger(__name__)
 
 
 def main():
@@ -22,7 +25,7 @@ def main():
     log_dir = log_manager.create_log_dir("log")
 
     # Dual solver
-    ds_tolerance = 10 ** -2
+    ds_tolerance = 10**-2
     ds_max_iterations = 1000
     dual_solver = dualsolver.BundleMethod(
         ds_max_iterations, ds_tolerance, log_dir
@@ -30,7 +33,11 @@ def main():
 
     # Setup
     algo = sddipclassical.Algorithm(
-        test_case, n_stages, n_realizations, log_dir, dual_solver=dual_solver,
+        test_case,
+        n_stages,
+        n_realizations,
+        log_dir,
+        dual_solver=dual_solver,
     )
     algo.n_binaries = init_n_binaries
 
@@ -47,8 +54,9 @@ def main():
     # Execution
     try:
         algo.run(n_iterations)
-    except KeyboardInterrupt as e:
-        print("Shutdown request ... exiting")
+    except KeyboardInterrupt:
+        logger.warning("Shutdown request ... exiting")
+        raise
     finally:
         try:
             # Manage results
@@ -62,8 +70,9 @@ def main():
                 algo.cc_storage.export_results(results_dir)
             if algo.cut_types_added - set([CutModes.LAGRANGIAN]):
                 algo.bc_storage.export_results(results_dir)
-        except ValueError:
-            print("Export incomplete.")
+        except ValueError as ex:
+            logger.error("Export incomplete: %s", ex)
+
 
 
 if __name__ == "__main__":

@@ -1,5 +1,5 @@
 from pathlib import Path
-from ..sddip import config
+from .. import config
 
 
 def main():

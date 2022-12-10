@@ -1,4 +1,5 @@
 from enum import Enum
+import logging
 from time import time
 
 import gurobipy as gp
@@ -14,6 +15,8 @@ from . import ucmodeldynamic
 from . import utils
 from .constants import ResultKeys
 from .dualsolver import DualSolverMethods
+
+logger = logging.getLogger(__name__)
 
 
 class CutModes(Enum):
@@ -48,7 +51,7 @@ class Algorithm:
         self.no_improvement_tolerance = 10 ** (-8)
         self.stop_stabilization_count = 5
         self.refinement_stabilization_count = 2
-        self.big_m = 10 ** 6
+        self.big_m = 10**6
         self.sos = False
         self.time_limit_minutes = 5 * 60
         self.n_samples_final_ub = 150
@@ -91,7 +94,7 @@ class Algorithm:
         )
 
     def run(self, n_iterations: int):
-        print("#### SDDiP-Algorithm started ####")
+        logger.info("#### SDDiP-Algorithm started ####")
         self.runtime_logger.start()
         self.dual_solver.runtime_logger.start()
         self.current_cut_mode = self.primary_cut_mode
@@ -99,7 +102,7 @@ class Algorithm:
         lower_bounds = []
         lagrangian_cut_iterations = []
         for i in range(n_iterations):
-            print(f"Iteration {i+1}")
+            logger.info("Iteration %s", i + 1)
 
             ########################################
             # Binary approximation refinement
@@ -120,7 +123,7 @@ class Algorithm:
             sampling_start_time = time()
             n_samples = self.n_samples
             samples = self.sc_sampler.generate_samples(n_samples)
-            print(f"Samples: {samples}")
+            logger.info("Samples: %s", samples)
             self.runtime_logger.log_task_end(
                 f"sampling_i{i+1}", sampling_start_time
             )
@@ -141,7 +144,7 @@ class Algorithm:
             v_upper_l, v_upper_r = self.statistical_upper_bound(
                 v_opt_k, n_samples
             )
-            print("Statistical upper bound: {} ".format(v_upper_l))
+            logger.info("Statistical upper bound: {} ".format(v_upper_l))
             self.runtime_logger.log_task_end(
                 f"upper_bound_i{i+1}", upper_bound_start_time
             )
@@ -173,7 +176,7 @@ class Algorithm:
             lower_bound_start_time = time()
             v_lower = self.lower_bound(i + 1)
             lower_bounds.append(v_lower)
-            print("Lower bound: {} ".format(v_lower))
+            logger.info("Lower bound: {} ".format(v_lower))
             self.runtime_logger.log_task_end(
                 f"lower_bound_i{i+1}", lower_bound_start_time
             )
@@ -206,7 +209,7 @@ class Algorithm:
                     < self.no_improvement_tolerance
                 )
             if stagnation:
-                print("Lower bound stabilized.")
+                logger.info("Lower bound stabilized.")
                 break
 
         self.runtime_logger.log_experiment_end()
@@ -226,7 +229,7 @@ class Algorithm:
         bound_dict[ResultKeys.ub_r_key] = v_upper_r
         self.bound_storage.add_result(n_iterations, 0, 0, bound_dict)
 
-        print("#### SDDiP-Algorithm finished ####")
+        logger.info("#### SDDiP-Algorithm finished ####")
 
     def forward_pass(self, iteration: int, samples: list) -> list:
         i = iteration
@@ -253,8 +256,8 @@ class Algorithm:
                     self.problem_params.backsight_periods,
                 )
 
-                uc_fw: ucmodeldynamic.ForwardModelBuilder = self.add_problem_constraints(
-                    uc_fw, t, n, i
+                uc_fw: ucmodeldynamic.ForwardModelBuilder = (
+                    self.add_problem_constraints(uc_fw, t, n, i)
                 )
 
                 uc_fw.add_copy_constraints(
@@ -348,7 +351,7 @@ class Algorithm:
             refinement_condition
             and self.current_cut_mode == CutModes.LAGRANGIAN
         ):
-            print("Refinement performed.")
+            logger.info("Refinement performed.")
             self.n_binaries += (
                 1 if self.n_binaries < self.max_n_binaries else 0
             )
@@ -363,7 +366,9 @@ class Algorithm:
             self.binarizer.calc_max_abs_error(prec)
             for prec in continuous_variables_precision
         ]
-        print(f"Approximation errors: {continuous_variables_approx_error}")
+        logger.info(
+            f"Approximation errors: {continuous_variables_approx_error}"
+        )
 
     def select_cut_mode(self, iteration: int, lower_bounds: list):
         no_improvement_condition = False
@@ -466,8 +471,8 @@ class Algorithm:
                         soc_binary_trial_point,
                     )
 
-                    uc_bw: ucmodeldynamic.BackwardModelBuilder = self.add_problem_constraints(
-                        uc_bw, t, n, i
+                    uc_bw: ucmodeldynamic.BackwardModelBuilder = (
+                        self.add_problem_constraints(uc_bw, t, n, i)
                     )
 
                     uc_bw.add_copy_constraints(
@@ -476,7 +481,7 @@ class Algorithm:
                     )
 
                     objective_terms = uc_bw.objective_terms
-                    # print(objective_terms)
+                    # logger.info(objective_terms)
                     relaxed_terms = uc_bw.relaxed_terms
 
                     uc_bw.disable_output()
@@ -493,7 +498,9 @@ class Algorithm:
                     )
 
                     _, dual_results = self.dual_solver.solve(
-                        uc_bw.model, objective_terms, relaxed_terms,
+                        uc_bw.model,
+                        objective_terms,
+                        relaxed_terms,
                     )
                     dual_multipliers = dual_results.multipliers.tolist()
                     dual_value = dual_results.obj_value - np.array(
@@ -575,8 +582,8 @@ class Algorithm:
                         lp_relax=True,
                     )
 
-                    uc_fw: ucmodeldynamic.ForwardModelBuilder = self.add_problem_constraints(
-                        uc_fw, t, n, i
+                    uc_fw: ucmodeldynamic.ForwardModelBuilder = (
+                        self.add_problem_constraints(uc_fw, t, n, i)
                     )
 
                     uc_fw.add_copy_constraints(
@@ -626,8 +633,8 @@ class Algorithm:
                             self.problem_params.storages_at_bus,
                             self.problem_params.backsight_periods,
                         )
-                        dual_model: ucmodeldynamic.ForwardModelBuilder = self.add_problem_constraints(
-                            dual_model, t, n, i
+                        dual_model: ucmodeldynamic.ForwardModelBuilder = (
+                            self.add_problem_constraints(dual_model, t, n, i)
                         )
 
                         copy_terms = dual_model.get_copy_terms(
@@ -682,8 +689,8 @@ class Algorithm:
             self.problem_params.backsight_periods,
         )
 
-        uc_fw: ucmodeldynamic.ForwardModelBuilder = self.add_problem_constraints(
-            uc_fw, t, n, i
+        uc_fw: ucmodeldynamic.ForwardModelBuilder = (
+            self.add_problem_constraints(uc_fw, t, n, i)
         )
 
         uc_fw.add_copy_constraints(
@@ -696,8 +703,8 @@ class Algorithm:
 
         # Value of stage t objective function
         v_lower = uc_fw.model.getObjective().getValue()
-        # print(f"Delta: {uc_fw.delta.x}")
-        # print(f"Theta: {uc_fw.theta.x}")
+        # logger.info(f"Delta: {uc_fw.delta.x}")
+        # logger.info(f"Theta: {uc_fw.theta.x}")
         # if i == 10:
         #     uc_fw.model.write("model.lp")
         return v_lower

@@ -1,10 +1,13 @@
+import logging
 import os
 
 import numpy as np
 import pandas as pd
 
-from . import config
+from .. import config
 from . import utils
+
+logger = logging.getLogger(__name__)
 
 
 class Parameters:
@@ -113,16 +116,14 @@ class Parameters:
         self.initialize()
 
     def initialize(self):
-        """Triggers the initialization of all parameters based on the corresponding data frames
-        """
+        """Triggers the initialization of all parameters based on the corresponding data frames"""
         self._calc_ptdf()
         self._init_deterministic_parameters()
         self._init_stochastic_parameters()
         self._init_initial_trial_points()
 
     def _calc_ptdf(self):
-        """Calculates the Power Transmission Distribution Factor and infers the number of buses and lines
-        """
+        """Calculates the Power Transmission Distribution Factor and infers the number of buses and lines"""
         nodes = self.bus_df.bus_i.values.tolist()
         edges = self.branch_df[["fbus", "tbus"]].values.tolist()
 
@@ -133,7 +134,7 @@ class Parameters:
         self.incidence_matrix = graph.incidence_matrix()
 
         b_l = (
-            -self.branch_df.x / (self.branch_df.r ** 2 + self.branch_df.x ** 2)
+            -self.branch_df.x / (self.branch_df.r**2 + self.branch_df.x**2)
         ).tolist()
         b_diag = np.diag(b_l)
 
@@ -147,12 +148,11 @@ class Parameters:
         ptdf = m1.dot(np.linalg.inv(m2))
 
         self.ptdf = np.insert(ptdf, ref_bus - 1, 0, axis=1)
-        self.ptdf[abs(self.ptdf) < 10 ** -10] = 0
+        self.ptdf[abs(self.ptdf) < 10**-10] = 0
         self.n_lines, self.n_buses = self.ptdf.shape
 
     def _init_deterministic_parameters(self):
-        """Initializes all deterministic parameters
-        """
+        """Initializes all deterministic parameters"""
         self.gen_cost_df
         self.gen_df
         self.branch_df
@@ -199,7 +199,7 @@ class Parameters:
         self.eff_dc = self.storage_df["Effdc"].values.tolist()
 
         # TODO Adjust penalty for slack variables
-        self.penalty = 10 ** 2
+        self.penalty = 10**2
 
         self.cost_coeffs = (
             self.gc.tolist()
@@ -208,7 +208,7 @@ class Parameters:
             + [self.penalty] * 2
         )
 
-        print(f"Cost coefficients: {self.cost_coeffs}")
+        logger.info(f"Cost coefficients: {self.cost_coeffs}")
 
         self.pg_min = self.gen_df.Pmin.values.tolist()
         self.pg_max = self.gen_df.Pmax.values.tolist()
@@ -244,8 +244,7 @@ class Parameters:
         self.gens_at_bus = gens_at_bus
 
     def _init_stochastic_parameters(self):
-        """Initializes all stochastic parameters
-        """
+        """Initializes all stochastic parameters"""
         scenario_df = self.scenario_df
 
         self.n_realizations_per_stage = (
@@ -283,8 +282,7 @@ class Parameters:
         self.cut_lb = [0] * self.n_stages
 
     def _init_initial_trial_points(self):
-        """Initializes the first stage trial points
-        """
+        """Initializes the first stage trial points"""
         self.init_x_trial_point = [0] * self.n_gens
         self.init_y_trial_point = [0] * self.n_gens
         self.init_x_bs_trial_point = [

@@ -2,7 +2,7 @@ import os
 import pandas as pd
 
 from datetime import datetime
-from . import config
+from .. import config
 
 
 class ResultsManager:

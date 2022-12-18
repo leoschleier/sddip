@@ -3,22 +3,26 @@ import numpy as np
 import pandas as pd
 import random as rdm
 
-from . import config
+from .. import config
 
 
 class ScenarioGenerator:
 
-    h0_load_profile = pd.read_csv(config.h0_load_profile_file, delimiter="\t")
+    h0_load_profile = pd.read_csv(config.H0_LOAD_PROFILE_FILE, delimiter="\t")
 
     def __init__(self, n_stages, n_realizations_per_stage):
         if n_stages < 2:
             raise ValueError("Number of stages must be greater than 1.")
         if n_realizations_per_stage < 2:
-            raise ValueError("Number of realizations per stage must be greater than 1.")
+            raise ValueError(
+                "Number of realizations per stage must be greater than 1."
+            )
         self.h0_profile = ScenarioGenerator.h0_load_profile.h0.values.tolist()
         self.n_stages = n_stages
         self.n_realizations_per_stage = n_realizations_per_stage
-        self.n_total_realizations = (n_stages - 1) * n_realizations_per_stage + 1
+        self.n_total_realizations = (
+            n_stages - 1
+        ) * n_realizations_per_stage + 1
 
         self.reduction_factor = int(len(self.h0_load_profile) / n_stages)
 
@@ -35,10 +39,12 @@ class ScenarioGenerator:
                 "Number of maximum target values must equal the number of demand buses."
             )
 
-        reduced_profile = self.reduce_profile(self.h0_profile, self.reduction_factor)
+        reduced_profile = self.reduce_profile(
+            self.h0_profile, self.reduction_factor
+        )
 
         base_profiles = [
-            self.scale_profile(reduced_profile, max(max_value-10,0))
+            self.scale_profile(reduced_profile, max(max_value - 10, 0))
             for max_value in max_value_targets
         ]
 
@@ -55,7 +61,9 @@ class ScenarioGenerator:
         # Set loads for the first (deterministic) stage
         for b in range(len(demand_buses)):
             scenario_data[demand_bus_keys[b]] = [
-                self.get_rdm_variation(base_profiles[b][0], max_relative_variation)
+                self.get_rdm_variation(
+                    base_profiles[b][0], max_relative_variation
+                )
             ]
 
         # Set loads for stages >1
@@ -81,7 +89,7 @@ class ScenarioGenerator:
         step_sizes: list,
         min_values: list,
         max_values: list,
-        threshold:float,
+        threshold: float,
         max_relative_variation: float,
     ) -> pd.DataFrame:
         if not len(renewables_buses) == len(start_values):
@@ -115,7 +123,9 @@ class ScenarioGenerator:
         # Set generation for the first (deterministic) stage
         for b in range(len(renewables_buses)):
             scenario_data[renewables_bus_keys[b]] = [
-                self.get_rdm_variation(base_profiles[b][0], max_relative_variation)
+                self.get_rdm_variation(
+                    base_profiles[b][0], max_relative_variation
+                )
             ]
 
         # Set loads for stages >1
@@ -164,7 +174,9 @@ class ScenarioGenerator:
 
         return values
 
-    def create_bus_keys(self, n_buses: int, active_buses: list, label: str) -> Tuple:
+    def create_bus_keys(
+        self, n_buses: int, active_buses: list, label: str
+    ) -> Tuple:
         active_bus_keys = []
         inactive_bus_keys = []
 

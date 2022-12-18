@@ -1,7 +1,7 @@
 import os
 import pandas as pd
 from ..sddip import scenarios
-from ..sddip import config
+from .. import config
 
 
 def main():

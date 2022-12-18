@@ -1,11 +1,10 @@
+import logging
 import gurobipy as gp
-
-# import sys, os
-
-# sys.path.append(os.path.join(os.path.dirname(sys.path[0]), "sddip"))
 
 from time import time
 from ..sddip import parameters, tree, logger
+
+logger = logging.getLogger(__name__)
 
 
 def main():
@@ -20,7 +19,7 @@ def main():
 
     runtime_logger.start()
 
-    print("Building the model...")
+    logger.info("Building the model...")
 
     params = parameters.Parameters(test_case_name, n_stages, n_realizations)
 
@@ -29,7 +28,7 @@ def main():
     runtime_logger.log_task_end(
         "scenario_tree_construction", scenario_tree_construction_start_time
     )
-    print(scenario_tree)
+    logger.info(scenario_tree)
 
     ########################################################################################################################
     # Variables initialization
@@ -111,7 +110,7 @@ def main():
     ########################################################################################################################
 
     # Objective
-    print("Adding objective...")
+    logger.info("Adding objective...")
 
     conditional_probabilities = []
     p = 1
@@ -153,7 +152,7 @@ def main():
     model.setObjective(obj)
 
     # Balance constraints
-    print("Adding balance constraints...")
+    logger.info("Adding balance constraints...")
 
     model.addConstrs(
         (
@@ -174,7 +173,7 @@ def main():
     )
 
     # Generator constraints
-    print("Adding generation constraints...")
+    logger.info("Adding generation constraints...")
 
     model.addConstrs(
         (
@@ -197,7 +196,7 @@ def main():
     )
 
     # Storage constraints
-    print("Adding storage constraints...")
+    logger.info("Adding storage constraints...")
 
     model.addConstrs(
         (
@@ -230,7 +229,7 @@ def main():
     )
 
     # SOC transfer
-    print("Adding SOC constraints...")
+    logger.info("Adding SOC constraints...")
 
     # t=0
     soc_init = params.init_soc_trial_point
@@ -275,7 +274,7 @@ def main():
     )
 
     # Power flow constraints
-    print("Adding power flow constraints...")
+    logger.info("Adding power flow constraints...")
 
     for t in range(params.n_stages):
         for node in scenario_tree.get_stage_nodes(t):
@@ -313,7 +312,7 @@ def main():
             )
 
     # Startup shutdown constraints
-    print("Adding start-up and shut-down constraints...")
+    logger.info("Adding start-up and shut-down constraints...")
 
     # t=0
     x_init = [0] * params.n_gens
@@ -354,7 +353,7 @@ def main():
             )
 
     # Ramp rate constraints
-    print("Adding ramp rate constraints...")
+    logger.info("Adding ramp rate constraints...")
 
     # t=0
     y_init = [0] * params.n_gens
@@ -405,7 +404,7 @@ def main():
             )
 
     # Minimum up- and down-time constraints
-    print("Adding up- and down-time constraints...")
+    logger.info("Adding up- and down-time constraints...")
 
     for g in range(params.n_gens):
         for t in range(1, params.min_up_time[g]):
@@ -472,14 +471,14 @@ def main():
     model.setParam("OutputFlag", 1)
     model.setParam("TimeLimit", 5 * 60 * 60)
 
-    print("Solving process started...")
+    logger.info("Solving process started...")
     model_solving_start_time = time()
     model.optimize()
 
     # model.computeIIS()
     # model.write("model.ilp")
     # model.display()
-    # model.printAttr("X")
+    # model.logger.infoAttr("X")
     # model.write("model.lp")
 
     runtime_logger.log_task_end("model_solving", model_solving_start_time)
@@ -489,31 +488,31 @@ def main():
     for variable in slack_variables:
         total_slack += sum([slack.x for _, slack in variable.items()])
 
-    # print(sum([slack.x for _, slack in delta.items()]))
-    # print(sum([slack.x for _, slack in socs_p.items()]))
-    # print(sum([slack.x for _, slack in socs_n.items()]))
+    # logger.info(sum([slack.x for _, slack in delta.items()]))
+    # logger.info(sum([slack.x for _, slack in socs_p.items()]))
+    # logger.info(sum([slack.x for _, slack in socs_n.items()]))
 
-    # print("Charge")
-    # print(ys_charge[0, 0, 0].x)
-    # print(ys_charge[1, 0, 0].x)
-    # print(ys_charge[1, 1, 0].x)
-    # print(ys_charge[1, 2, 0].x)
-    # print("Discharge")
-    # print(ys_discharge[0, 0, 0].x)
-    # print(ys_discharge[1, 0, 0].x)
-    # print(ys_discharge[1, 1, 0].x)
-    # print(ys_discharge[1, 2, 0].x)
-    # print("SOC")
-    # print(soc[0, 0, 0].x)
-    # print(soc[1, 0, 0].x)
-    # print(soc[1, 1, 0].x)
-    # print(soc[1, 2, 0].x)
+    # logger.info("Charge")
+    # logger.info(ys_charge[0, 0, 0].x)
+    # logger.info(ys_charge[1, 0, 0].x)
+    # logger.info(ys_charge[1, 1, 0].x)
+    # logger.info(ys_charge[1, 2, 0].x)
+    # logger.info("Discharge")
+    # logger.info(ys_discharge[0, 0, 0].x)
+    # logger.info(ys_discharge[1, 0, 0].x)
+    # logger.info(ys_discharge[1, 1, 0].x)
+    # logger.info(ys_discharge[1, 2, 0].x)
+    # logger.info("SOC")
+    # logger.info(soc[0, 0, 0].x)
+    # logger.info(soc[1, 0, 0].x)
+    # logger.info(soc[1, 1, 0].x)
+    # logger.info(soc[1, 2, 0].x)
 
-    print("Solving finished.")
-    print(f"Status: {model.Status}")
-    print(f"Optimal value: {obj.getValue()}")
-    print(f"Total slack: {total_slack}")
-    print(f"MIP gap: {model.MIPGap}")
+    logger.info("Solving finished.")
+    logger.info(f"Status: {model.Status}")
+    logger.info(f"Optimal value: {obj.getValue()}")
+    logger.info(f"Total slack: {total_slack}")
+    logger.info(f"MIP gap: {model.MIPGap}")
 
     runtime_logger.log_experiment_end()
 

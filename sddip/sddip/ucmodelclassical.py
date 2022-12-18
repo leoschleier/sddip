@@ -1,6 +1,9 @@
+import logging
 import gurobipy as gp
 
 from .ucmodeldynamic import BackwardModelBuilder
+
+logger = logging.getLogger(__name__)
 
 
 class ClassicalModel(BackwardModelBuilder):
@@ -124,7 +127,9 @@ class ClassicalModel(BackwardModelBuilder):
         )
 
     def add_cut_constraints(
-        self, cut_intercepts: list, cut_gradients: list,
+        self,
+        cut_intercepts: list,
+        cut_gradients: list,
     ):
 
         state_variables = (
@@ -163,7 +168,7 @@ class ClassicalModel(BackwardModelBuilder):
             cut_intercepts, cut_gradients, trial_points
         ):
             if not n_state_variables == len(trial_point):
-                print(trial_point)
+                logger.warning("Trial point: %s", trial_point)
                 raise ValueError(
                     "Number of state variables must be equal to the number of trial points."
                 )
@@ -179,4 +184,3 @@ class ClassicalModel(BackwardModelBuilder):
                 ),
                 f"cut",
             )
-

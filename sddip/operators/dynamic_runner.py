@@ -1,6 +1,8 @@
+import logging
 from ..sddip import logger, sddipdynamic, storage, dualsolver
 from ..sddip.sddipdynamic import CutModes
 
+logger = logging.getLogger(__name__)
 
 def main():
     # Parameters
@@ -50,8 +52,9 @@ def main():
     # Execution
     try:
         algo.run(n_iterations)
-    except KeyboardInterrupt as e:
-        print("Shutdown request ... exiting")
+    except KeyboardInterrupt:
+        logger.warning("Shutdown request ... exiting")
+        raise
     finally:
         try:
             # Manage results
@@ -67,8 +70,8 @@ def main():
             if algo.cut_types_added - set([CutModes.LAGRANGIAN]):
                 algo.bc_storage.export_results(results_dir)
 
-        except ValueError:
-            print("Export incomplete.")
+        except ValueError as ex:
+            logger.error("Export incomplete: %s", ex)
 
 
 if __name__ == "__main__":

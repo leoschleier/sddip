@@ -1,4 +1,5 @@
 from enum import Enum
+import logging
 from time import time
 
 import gurobipy as gp
@@ -14,6 +15,9 @@ from . import ucmodelclassical
 from . import utils
 from .constants import ResultKeys
 from .dualsolver import DualSolverMethods
+
+
+logger = logging.getLogger(__name__)
 
 
 class CutModes(Enum):
@@ -48,7 +52,7 @@ class Algorithm:
         self.no_improvement_tolerance = 10 ** (-8)
         self.stop_stabilization_count = 5
         self.refinement_stabilization_count = 2
-        self.big_m = 10 ** 6
+        self.big_m = 10**6
         self.time_limit_minutes = 5 * 60
         self.n_samples_final_ub = 150
 
@@ -147,13 +151,15 @@ class Algorithm:
                 soc_init, soc_bin_multipliers[-1]
             )[0]
 
-        print(f"Approximation errors: {continuous_variables_approx_error}")
+        logger.info(
+            "Approximation errors: %s", continuous_variables_approx_error
+        )
 
         self.bin_multipliers["y"] = y_bin_multipliers
         self.bin_multipliers["soc"] = soc_bin_multipliers
 
     def run(self, n_iterations: int):
-        print("#### SDDiP-Algorithm started ####")
+        logger.info("#### SDDiP-Algorithm started ####")
         self.runtime_logger.start()
         self.dual_solver.runtime_logger.start()
         self.current_cut_mode = self.primary_cut_mode
@@ -164,7 +170,7 @@ class Algorithm:
         self.fixed_binary_approximation()
 
         for i in range(n_iterations):
-            print(f"Iteration {i+1}")
+            logger.info("Iteration %s", i + 1)
 
             ########################################
             # Cut mode selection
@@ -177,7 +183,7 @@ class Algorithm:
             sampling_start_time = time()
             n_samples = self.n_samples
             samples = self.sc_sampler.generate_samples(n_samples)
-            print(f"Samples: {samples}")
+            logger.info("Samples: %s", samples)
             self.runtime_logger.log_task_end(
                 f"sampling_i{i+1}", sampling_start_time
             )
@@ -198,7 +204,7 @@ class Algorithm:
             v_upper_l, v_upper_r = self.statistical_upper_bound(
                 v_opt_k, n_samples
             )
-            print("Statistical upper bound: {} ".format(v_upper_l))
+            logger.info("Statistical upper bound: %s", v_upper_l)
             self.runtime_logger.log_task_end(
                 f"upper_bound_i{i+1}", upper_bound_start_time
             )
@@ -229,7 +235,7 @@ class Algorithm:
             lower_bound_start_time = time()
             v_lower = self.lower_bound(i + 1)
             lower_bounds.append(v_lower)
-            print("Lower bound: {} ".format(v_lower))
+            logger.info("Lower bound: {} ".format(v_lower))
             self.runtime_logger.log_task_end(
                 f"lower_bound_i{i+1}", lower_bound_start_time
             )
@@ -262,7 +268,7 @@ class Algorithm:
                     < self.no_improvement_tolerance
                 )
             if stagnation:
-                print("Lower bound stabilized.")
+                logger.info("Lower bound stabilized.")
                 break
 
         self.runtime_logger.log_experiment_end()
@@ -282,7 +288,7 @@ class Algorithm:
         bound_dict[ResultKeys.ub_r_key] = v_upper_r
         self.bound_storage.add_result(n_iterations, 0, 0, bound_dict)
 
-        print("#### SDDiP-Algorithm finished ####")
+        logger.info("#### SDDiP-Algorithm finished ####")
 
     def forward_pass(self, iteration: int, samples: list) -> list:
         i = iteration
@@ -320,8 +326,8 @@ class Algorithm:
                     self.bin_multipliers["y"], self.bin_multipliers["soc"]
                 )
 
-                uc_fw: ucmodelclassical.ClassicalModel = self.add_problem_constraints(
-                    uc_fw, t, n, i
+                uc_fw: ucmodelclassical.ClassicalModel = (
+                    self.add_problem_constraints(uc_fw, t, n, i)
                 )
 
                 uc_fw.add_sddip_copy_constraints(
@@ -355,13 +361,13 @@ class Algorithm:
                 #         for val in x_n:
                 #             total_slack += val.x
                 #             x_slack += val.x
-                #     print(f"Total Slack: {total_slack}")
-                # print(f"Delta-Slack: {uc_fw.delta.x}")
-                # print(f"s-Slack: {s_slack}")
-                # print(f"x-Slack: {x_slack}")
-                # print(f"y-Slack: {y_slack}")
+                #     logger.info(f"Total Slack: {total_slack}")
+                # logger.info(f"Delta-Slack: {uc_fw.delta.x}")
+                # logger.info(f"s-Slack: {s_slack}")
+                # logger.info(f"x-Slack: {x_slack}")
+                # logger.info(f"y-Slack: {y_slack}")
                 #     if total_slack > 20:
-                #         print(f"Model export: Stage {t}")
+                #         logger.info(f"Model export: Stage {t}")
                 #         uc_fw.model.write("model.lp")
 
                 try:
@@ -490,8 +496,8 @@ class Algorithm:
                         self.bin_multipliers["y"], self.bin_multipliers["soc"]
                     )
 
-                    uc_bw: ucmodelclassical.ClassicalModel = self.add_problem_constraints(
-                        uc_bw, t, n, i
+                    uc_bw: ucmodelclassical.ClassicalModel = (
+                        self.add_problem_constraints(uc_bw, t, n, i)
                     )
 
                     uc_bw.relax_sddip_copy_constraints(
@@ -510,7 +516,7 @@ class Algorithm:
                     relaxed_terms = uc_bw.relaxed_terms
 
                     # if t == 1 and n == 1:
-                    #     print(relaxed_terms)
+                    #     logger.info(relaxed_terms)
                     #     uc_bw.model.write("model.lp")
 
                     uc_bw.disable_output()
@@ -527,7 +533,9 @@ class Algorithm:
                     )
 
                     _, sg_results = self.dual_solver.solve(
-                        uc_bw.model, objective_terms, relaxed_terms,
+                        uc_bw.model,
+                        objective_terms,
+                        relaxed_terms,
                     )
                     dual_multipliers = sg_results.multipliers.tolist()
                     dual_value = sg_results.obj_value - np.array(
@@ -620,8 +628,8 @@ class Algorithm:
                         self.bin_multipliers["y"], self.bin_multipliers["soc"]
                     )
 
-                    uc_fw: ucmodelclassical.ClassicalModel = self.add_problem_constraints(
-                        uc_fw, t, n, i
+                    uc_fw: ucmodelclassical.ClassicalModel = (
+                        self.add_problem_constraints(uc_fw, t, n, i)
                     )
 
                     uc_fw.add_sddip_copy_constraints(
@@ -672,8 +680,8 @@ class Algorithm:
                             self.bin_multipliers["y"],
                             self.bin_multipliers["soc"],
                         )
-                        dual_model: ucmodelclassical.ClassicalModel = self.add_problem_constraints(
-                            dual_model, t, n, i
+                        dual_model: ucmodelclassical.ClassicalModel = (
+                            self.add_problem_constraints(dual_model, t, n, i)
                         )
                         dual_model.relax_sddip_copy_constraints(
                             x_trial_point,

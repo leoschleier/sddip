@@ -4,7 +4,7 @@ import gurobipy as gp
 from time import time
 from datetime import datetime
 
-from . import config
+from .. import config
 
 
 class LogManager:

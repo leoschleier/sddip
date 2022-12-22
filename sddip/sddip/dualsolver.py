@@ -2,31 +2,26 @@ import copy
 import logging
 import os
 from abc import ABC, abstractmethod
-from enum import Enum
 from time import time
+from typing import Tuple
 
 import gurobipy as gp
 import numpy as np
 
-from . import logger
+from . import sddip_logging
 
 logger = logging.getLogger(__name__)
-
-
-class DualSolverMethods(Enum):
-    BUNDLE_METHOD = "bm"
-    SUBGRADIENT_METHOD = "sg"
 
 
 class DualSolver(ABC):
     def __init__(
         self, max_iterations: int, tolerance: float, log_dir: str, tag: str
     ):
-        self.TAG = tag
+        self.tag = tag
 
-        log_manager = logger.LogManager()
-        runtime_log_dir = log_manager.create_log_dir(f"{self.TAG}_log")
-        self.runtime_logger = logger.RuntimeLogger(runtime_log_dir)
+        log_manager = sddip_logging.LogManager()
+        runtime_log_dir = log_manager.create_log_dir(f"{self.tag}_log")
+        self.runtime_logger = sddip_logging.RuntimeLogger(runtime_log_dir)
 
         self.output_flag = False
         self.output_verbose = False
@@ -43,11 +38,14 @@ class DualSolver(ABC):
 
     @abstractmethod
     def solve(self):
-        pass
+        """Solve the dual problem."""
 
     def get_subgradient_and_value(
         self, model, objective_terms, relaxed_terms, dual_multipliers
-    ):
+    ) -> Tuple[np.ndarray, float]:
+        """Compute the subgradient and the objective value of the dual
+        problem.
+        """
         gradient_len = len(relaxed_terms)
 
         total_objective = objective_terms + gp.quicksum(
@@ -81,16 +79,14 @@ class DualSolver(ABC):
         method: str = "",
     ):
         logger.info(
-            "Dual solver finished ({sr}, m: {tm}, i: {iter}, st: {st}, "
-            "g: {gm}, lb: {lb})",
-            {
-                "sr": stop_reason,
-                "tm": self.TAG + method,
-                "iter": iteration,
-                "st": self.solver_time,
-                "gm": lowest_gradient_magnitude,
-                "lb": best_lower_bound,
-            },
+            "Dual solver finished (%s, m: %s, i: %s, st: %s, g: %s, "
+            "lb: %s)",
+            stop_reason,
+            self.tag + method,
+            iteration,
+            self.solver_time,
+            lowest_gradient_magnitude,
+            best_lower_bound,
         )
 
     def log_task_start(self):
@@ -98,8 +94,22 @@ class DualSolver(ABC):
 
     def log_task_end(self):
         self.runtime_logger.log_task_end(
-            f"{self.TAG}_{self.n_calls}", self.start_time
+            f"{self.tag}_{self.n_calls}", self.start_time
         )
+
+
+class SolverResults:
+    def __init__(self):
+        self.obj_value = None
+        self.multipliers = None
+        self.solver_time = None
+        self.n_iterations = None
+
+    def set_values(self, obj_value, multipliers, n_iterations, solver_time):
+        self.obj_value = obj_value
+        self.multipliers = multipliers
+        self.n_iterations = n_iterations
+        self.solver_time = solver_time
 
 
 class SubgradientMethod(DualSolver):
@@ -130,14 +140,14 @@ class SubgradientMethod(DualSolver):
         relaxed_terms,
         optimal_value_estimate: float = None,
         log_id: str = None,
-    ) -> gp.Model:
+    ) -> Tuple[gp.Model, SolverResults]:
 
         self.on_solver_call()
         model.setParam("OutputFlag", 0)
 
         if self.log_flag:
             current_log_dir = self.create_subgradient_log_dir(log_id)
-            gurobi_logger = logger.GurobiLogger(current_log_dir)
+            gurobi_logger = sddip_logging.GurobiLogger(current_log_dir)
 
         self.results = SolverResults()
 
@@ -345,15 +355,22 @@ class BundleMethod(DualSolver):
 
     def _absolute_predicted_ascent(
         self, current_value: float, new_value: float
-    ):
+    ) -> float:
+        """Compute absolute predicted ascent."""
         return max(new_value - current_value, 0)
 
     def _relative_predicted_ascent(
         self, current_value: float, new_value: float
-    ):
+    ) -> float:
+        """Compute relative predicted ascent."""
         return max((new_value - current_value) / current_value, 0)
 
-    def solve(self, model: gp.Model, objective_terms, relaxed_terms):
+    def solve(
+        self, model: gp.Model, objective_terms, relaxed_terms
+    ) -> Tuple[gp.Model, SolverResults]:
+        """Solve the dual problem using the bundle method."""
+
+        logger.debug("Starting the bundle method.")
 
         self.on_solver_call()
         model.setParam("OutputFlag", 0)
@@ -406,7 +423,6 @@ class BundleMethod(DualSolver):
             )
 
             # Predicted ascent
-            # delta = max(v.x - f_best, 0)
             delta = self._get_predicted_ascent(f_best, v.x)
 
             # Update lowest known gradient magnitude for logging purposes
@@ -428,6 +444,9 @@ class BundleMethod(DualSolver):
             # )
             if serious_step:
                 # Serious step
+                logger.debug("Serious step: i = %s, f_new = %s, "
+                             "f_best = %s, lowest_gm = %s",
+                             i+1, f_new, f_best, lowest_gm)
                 x_best = copy.copy(x_new)
                 f_best = copy.copy(f_new)
 
@@ -461,6 +480,9 @@ class BundleMethod(DualSolver):
         subgradient,
         serious_step,
     ):
+        """Update the weight for the bundle method with proximity
+        control.
+        """
         variation_estimate = var_est
 
         delta = f_hat - f_best
@@ -502,7 +524,11 @@ class BundleMethod(DualSolver):
 
         return u_new, i_u, variation_estimate
 
-    def create_subproblem(self, n_dual_multipliers: int):
+    def create_subproblem(
+        self, n_dual_multipliers: int
+    ) -> Tuple[gp.Model, gp.Var, gp.tupledict]:
+        """Create the bundle method's subproblem."""
+
         subproblem = gp.Model("Subproblem")
         subproblem.setParam("OutputFlag", 0)
         v = subproblem.addVar(
@@ -515,17 +541,3 @@ class BundleMethod(DualSolver):
             name="x",
         )
         return subproblem, v, x
-
-
-class SolverResults:
-    def __init__(self):
-        self.obj_value = None
-        self.multipliers = None
-        self.solver_time = None
-        self.n_iterations = None
-
-    def set_values(self, obj_value, multipliers, n_iterations, solver_time):
-        self.obj_value = obj_value
-        self.multipliers = multipliers
-        self.n_iterations = n_iterations
-        self.solver_time = solver_time

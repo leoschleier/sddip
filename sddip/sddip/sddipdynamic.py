@@ -7,14 +7,13 @@ import numpy as np
 from scipy import linalg, stats
 
 from . import dualsolver
-from . import logger
+from . import sddip_logging
 from . import parameters
 from . import scenarios
 from . import storage
 from . import ucmodeldynamic
 from . import utils
 from .constants import ResultKeys
-from .dualsolver import DualSolverMethods
 
 logger = logging.getLogger(__name__)
 
@@ -35,7 +34,7 @@ class Algorithm:
         dual_solver: dualsolver.DualSolver,
     ):
         # Logger
-        self.runtime_logger = logger.RuntimeLogger(log_dir)
+        self.runtime_logger = sddip_logging.RuntimeLogger(log_dir)
 
         # Problem specific parameters
         self.problem_params = parameters.Parameters(

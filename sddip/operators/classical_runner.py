@@ -1,5 +1,5 @@
 import logging
-from ..sddip import dualsolver, logger, sddipclassical, storage
+from ..sddip import dualsolver, sddip_logging, sddipclassical, storage
 from ..sddip.sddipclassical import CutModes
 
 logger = logging.getLogger(__name__)
@@ -21,7 +21,7 @@ def main():
     refinement_stabilization_count = 1
 
     # Logger
-    log_manager = logger.LogManager()
+    log_manager = sddip_logging.LogManager()
     log_dir = log_manager.create_log_dir("log")
 
     # Dual solver

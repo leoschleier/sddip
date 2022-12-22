@@ -2,7 +2,7 @@ import logging
 import gurobipy as gp
 
 from time import time
-from ..sddip import parameters, tree, logger
+from ..sddip import parameters, sddip_logging, tree
 
 logger = logging.getLogger(__name__)
 
@@ -13,9 +13,9 @@ def main():
     n_stages = 8
     n_realizations = 6
 
-    log_manager = logger.LogManager()
+    log_manager = sddip_logging.LogManager()
     log_dir = log_manager.create_log_dir(f"{test_case_name}_ext")
-    runtime_logger = logger.RuntimeLogger(log_dir)
+    runtime_logger = sddip_logging.RuntimeLogger(log_dir)
 
     runtime_logger.start()
 

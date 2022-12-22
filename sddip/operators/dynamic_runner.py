@@ -1,8 +1,9 @@
 import logging
-from ..sddip import logger, sddipdynamic, storage, dualsolver
+from ..sddip import sddip_logging, sddipdynamic, storage, dualsolver
 from ..sddip.sddipdynamic import CutModes
 
 logger = logging.getLogger(__name__)
+
 
 def main():
     # Parameters
@@ -20,11 +21,11 @@ def main():
     refinement_stabilization_count = 5
 
     # Logger
-    log_manager = logger.LogManager()
+    log_manager = sddip_logging.LogManager()
     log_dir = log_manager.create_log_dir("log")
 
     # Dual solver
-    ds_tolerance = 10 ** -3
+    ds_tolerance = 10**-3
     ds_max_iterations = 50
     dual_solver = dualsolver.BundleMethod(
         ds_max_iterations, ds_tolerance, log_dir
@@ -32,11 +33,15 @@ def main():
 
     # Setup
     algo = sddipdynamic.Algorithm(
-        test_case, n_stages, n_realizations, log_dir, dual_solver=dual_solver,
+        test_case,
+        n_stages,
+        n_realizations,
+        log_dir,
+        dual_solver=dual_solver,
     )
     algo.n_binaries = init_n_binaries
 
-    algo.big_m = 10 ** 3
+    algo.big_m = 10**3
     algo.sos = False
 
     algo.primary_cut_mode = CutModes.STRENGTHENED_BENDERS
@@ -71,7 +76,7 @@ def main():
                 algo.bc_storage.export_results(results_dir)
 
         except ValueError as ex:
-            logger.error("Export incomplete: %s", ex)
+            logger.exception("Export incomplete: %s", ex)
 
 
 if __name__ == "__main__":

@@ -153,9 +153,6 @@ class Parameters:
 
     def _init_deterministic_parameters(self):
         """Initializes all deterministic parameters"""
-        self.gen_cost_df
-        self.gen_df
-        self.branch_df
 
         gc_positive = np.where(self.gen_cost_df.c1 > 0, self.gen_cost_df.c1, 1)
         suc_positive = np.where(

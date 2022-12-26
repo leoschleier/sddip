@@ -3,7 +3,7 @@ import logging
 import os
 from abc import ABC, abstractmethod
 from time import time
-from typing import Tuple
+from typing import Optional, Tuple
 
 import gurobipy as gp
 import numpy as np
@@ -77,13 +77,21 @@ class DualSolver(ABC):
         lowest_gradient_magnitude: float,
         best_lower_bound: float,
         method: str = "",
+        n_serious_steps: Optional[int] = None,
     ):
+        if n_serious_steps is not None:
+            n_null_steps = iteration - n_serious_steps
+            steps = f", ns/ss: {n_null_steps}/{n_serious_steps}"
+        else:
+            steps = ""
+
         logger.info(
-            "Dual solver finished (%s, m: %s, i: %s, st: %s, g: %s, "
-            "lb: %s)",
+            "Dual solver finished (%s, m: %s, i: %s%s, st: %.3f, "
+            "g: %.3f, lb: %.3f)",
             stop_reason,
             self.tag + method,
             iteration,
+            steps,
             self.solver_time,
             lowest_gradient_magnitude,
             best_lower_bound,
@@ -370,7 +378,7 @@ class BundleMethod(DualSolver):
     ) -> Tuple[gp.Model, SolverResults]:
         """Solve the dual problem using the bundle method."""
 
-        logger.debug("Starting the bundle method.")
+        logger.debug("Bundle method started")
 
         self.on_solver_call()
         model.setParam("OutputFlag", 0)
@@ -379,6 +387,8 @@ class BundleMethod(DualSolver):
         u = self.u_init
         i_u = 0
         var_est = 10**8
+
+        n_serious_steps = 0
 
         gradient_len = len(relaxed_terms)
         x_new = np.zeros(gradient_len)
@@ -444,11 +454,17 @@ class BundleMethod(DualSolver):
             # )
             if serious_step:
                 # Serious step
-                logger.debug("Serious step: i = %s, f_new = %s, "
-                             "f_best = %s, lowest_gm = %s",
-                             i+1, f_new, f_best, lowest_gm)
+                logger.debug(
+                    "Serious step: i = %s, f_new = %s, "
+                    "f_best = %s, lowest_gm = %s",
+                    i + 1,
+                    f_new,
+                    f_best,
+                    lowest_gm,
+                )
                 x_best = copy.copy(x_new)
                 f_best = copy.copy(f_new)
+                n_serious_steps += 1
 
             # Check stopping criterion
             if delta <= self.tolerance:
@@ -459,7 +475,13 @@ class BundleMethod(DualSolver):
 
         self.log_task_end()
 
-        self.log_method_finished(stop_reason, i + 1, lowest_gm, f_best)
+        self.log_method_finished(
+            stop_reason,
+            i + 1,
+            lowest_gm,
+            f_best,
+            n_serious_steps=n_serious_steps,
+        )
 
         self.results.set_values(
             f_best, np.array(x_best), i + 1, self.solver_time

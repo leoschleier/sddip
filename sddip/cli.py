@@ -19,7 +19,7 @@ def main(argv: List[str]):
     """Run the command line interface."""
     args = _parse_arguments(argv)
 
-    _init_logging()
+    _init_logging(args.verbose)
     logger.info("Executing the SDDIP package.")
 
     run_func = _get_run_func(args)

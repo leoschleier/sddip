@@ -26,7 +26,7 @@ def main():
 
     # Dual solver
     ds_tolerance = 10**-2
-    ds_max_iterations = 1000
+    ds_max_iterations = 100
     dual_solver = dualsolver.BundleMethod(
         ds_max_iterations, ds_tolerance, log_dir
     )
@@ -49,7 +49,7 @@ def main():
     algo.time_limit_minutes = time_limit_minutes
     algo.stop_stabilization_count = stop_stabilization_count
     algo.refinement_stabilization_count = refinement_stabilization_count
-    algo.n_samples_final_ub = 150
+    algo.n_samples_final_ub = 300
 
     # Execution
     try:

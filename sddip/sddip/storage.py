@@ -12,8 +12,7 @@ class ResultsManager:
     def create_results_dir(self, dir_label: str) -> str:
         start_time_str = datetime.today().strftime("%Y_%m_%d__%H_%M_%S")
         dir_name = f"{dir_label}_{start_time_str}"
-        results_dir = os.path.join(config.solutions_dir, dir_name)
-        os.mkdir(results_dir)
+        results_dir = config.RESULTS_DIR / dir_name
 
         return results_dir
 
@@ -26,11 +25,17 @@ class ResultStorage:
         self.results = {}
 
     def add_result(
-        self, iteration_index: int, sample_index: int, stage_index: int, results: dict
+        self,
+        iteration_index: int,
+        sample_index: int,
+        stage_index: int,
+        results: dict,
     ):
         self.results[iteration_index, sample_index, stage_index] = results
 
-    def get_result(self, iteration_index: int, sample_index: int, stage_index: int):
+    def get_result(
+        self, iteration_index: int, sample_index: int, stage_index: int
+    ):
         return self.results[iteration_index, sample_index, stage_index]
 
     def get_stage_result(self, stage_index: int):

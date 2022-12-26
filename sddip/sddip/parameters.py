@@ -27,13 +27,13 @@ class Parameters:
         scenario_file="scenario_data.txt",
     ):
         raw_data_dir = os.path.join(
-            config.test_cases_dir, test_case_name, raw_directory
+            config.TEST_CASES_DIR, test_case_name, raw_directory
         )
         scenario_str = (
             f"t{str(n_stages).zfill(2)}_n{str(n_realizations).zfill(2)}"
         )
         scenario_data_dir = os.path.join(
-            config.test_cases_dir, test_case_name, scenario_str
+            config.TEST_CASES_DIR, test_case_name, scenario_str
         )
 
         raw_data_importer = DataImporter(raw_data_dir)

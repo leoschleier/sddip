@@ -343,9 +343,9 @@ class BundleMethod(DualSolver):
         super().__init__(max_iterations, tolerance, log_dir, self.TAG)
 
         self.u_init = 1
-        self.u_min = 0.1
-        self.m_l = 0.3
-        self.m_r = 0.7
+        self.u_min = 0.1  # > 0
+        self.m_l = 0.4  # (0, 0.5)
+        self.m_r = 0.7  # (m_l, 1)
 
         self.predicted_ascent = predicted_ascent
 
@@ -440,26 +440,37 @@ class BundleMethod(DualSolver):
 
             serious_step = f_new - f_best >= self.m_l * delta
             # Weight update
-            # u, i_u, var_est = self.weight_update(
-            #     u,
-            #     i_u,
-            #     var_est,
-            #     x_new,
-            #     f_new,
-            #     x_best,
-            #     f_best,
-            #     v.x,
-            #     subgradient,
-            #     serious_step,
-            # )
+            u, i_u, var_est = self.weight_update(
+                u,
+                i_u,
+                var_est,
+                x_new,
+                f_new,
+                x_best,
+                f_best,
+                v.x,
+                subgradient,
+                serious_step,
+            )
+
+            logger.debug(
+                "Weight update: u = %.3f, i_u = %s, var_est = %s",
+                u,
+                i_u,
+                var_est,
+            )
+
             if serious_step:
                 # Serious step
                 logger.debug(
-                    "Serious step: i = %s, f_new = %s, "
-                    "f_best = %s, lowest_gm = %s",
+                    "Serious step: i = %s, f_new = %.3f, "
+                    "f_best = %.3f, f_delta = %.3f, pred_asc = %.3f, "
+                    "lowest_gm = %.3f",
                     i + 1,
                     f_new,
                     f_best,
+                    f_new - f_best,
+                    delta,
                     lowest_gm,
                 )
                 x_best = copy.copy(x_new)
@@ -510,26 +521,26 @@ class BundleMethod(DualSolver):
         delta = f_hat - f_best
         u_int = 2 * u_current * (1 - (f_new - f_best) / delta)
         u = u_current
-        # print(f"f: {f_new - f_best}")
+
         if serious_step:
+            # This is if x_i+1 != x_i
             weight_too_large = (f_new - f_best) >= (self.m_r * delta)
             if weight_too_large and i_u > 0:
                 u = u_int
             elif i_u > 3:
                 u = u_current / 2
             u_new = max(u, u_current / 10, self.u_min)
-            # print(f"u: {u}, {u_current/10}, {self.u_min}")
             variation_estimate = max(variation_estimate, 2 * delta)
             i_u = max(i_u + 1, 1) if u_new == u_current else 1
             # Exit
         else:
-            # print("Null")
+            # This is if x_i+1 = x_i
             p = -u_current * (np.array(x_new) - np.array(x_best))
             alpha = delta - np.linalg.norm(p, ord=2) ** 2 / u_current
             variation_estimate = min(
                 variation_estimate, np.linalg.norm(p, ord=1) + alpha
             )
-            # x_best x_new Reihenfolge ?
+            # x_best x_new Reihenfolge?
             linearization_error = (
                 f_new
                 + np.array(subgradient).dot(np.array(x_best) - np.array(x_new))

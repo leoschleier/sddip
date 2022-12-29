@@ -143,7 +143,7 @@ class Algorithm:
             v_upper_l, v_upper_r = self.statistical_upper_bound(
                 v_opt_k, n_samples
             )
-            logger.info("Statistical upper bound: {} ".format(v_upper_l))
+            logger.info("Statistical upper bound: %s ", v_upper_l)
             self.runtime_logger.log_task_end(
                 f"upper_bound_i{i+1}", upper_bound_start_time
             )
@@ -175,7 +175,7 @@ class Algorithm:
             lower_bound_start_time = time()
             v_lower = self.lower_bound(i + 1)
             lower_bounds.append(v_lower)
-            logger.info("Lower bound: {} ".format(v_lower))
+            logger.info("Lower bound: %s", v_lower)
             self.runtime_logger.log_task_end(
                 f"lower_bound_i{i+1}", lower_bound_start_time
             )
@@ -366,7 +366,7 @@ class Algorithm:
             for prec in continuous_variables_precision
         ]
         logger.info(
-            f"Approximation errors: {continuous_variables_approx_error}"
+            "Approximation errors: %s", continuous_variables_approx_error
         )
 
     def select_cut_mode(self, iteration: int, lower_bounds: list):

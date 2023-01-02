@@ -12,7 +12,7 @@ def main():
     n_realizations = 3
 
     init_n_binaries = 6
-    n_iterations = 1
+    n_iterations = 10
     time_limit_minutes = 5 * 60
 
     # Number of iterations after an unchanging
@@ -25,7 +25,7 @@ def main():
     log_dir = log_manager.create_log_dir("log")
 
     # Dual solver
-    ds_tolerance = 10**-3
+    ds_tolerance = 10**-6
     ds_max_iterations = 10000
     dual_solver = dualsolver.BundleMethod(
         ds_max_iterations, ds_tolerance, log_dir, predicted_ascent="abs"

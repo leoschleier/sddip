@@ -344,8 +344,8 @@ class BundleMethod(DualSolver):
 
         self.u_init = 1
         self.u_min = 0.1  # > 0
-        self.m_l = 0.4  # (0, 0.5)
-        self.m_r = 0.7  # (m_l, 1)
+        self.m_l = 0.1  # (0, 0.5)
+        self.m_r = 0.5  # (m_l, 1)
 
         self.predicted_ascent = predicted_ascent
 
@@ -386,7 +386,7 @@ class BundleMethod(DualSolver):
         tolerance_reached = False
         u = self.u_init
         i_u = 0
-        var_est = 10**8
+        var_est = 10**9
 
         n_serious_steps = 0
 
@@ -454,7 +454,7 @@ class BundleMethod(DualSolver):
             )
 
             logger.debug(
-                "Weight update: u = %.3f, i_u = %s, var_est = %s",
+                "Weight update: u = %.3f, i_u = %s, var_est = %.3f",
                 u,
                 i_u,
                 var_est,

@@ -8,11 +8,11 @@ logger = logging.getLogger(__name__)
 def main():
     # Parameters
     test_case = "case6ww"
-    n_stages = 6
-    n_realizations = 3
+    n_stages = 8
+    n_realizations = 6
 
     init_n_binaries = 6
-    n_iterations = 10
+    n_iterations = 100
     time_limit_minutes = 5 * 60
 
     # Number of iterations after an unchanging
@@ -44,15 +44,15 @@ def main():
     algo.big_m = 10**3
     algo.sos = False
 
-    algo.primary_cut_mode = CutModes.LAGRANGIAN
-    algo.n_samples_primary = 1
+    algo.primary_cut_mode = CutModes.STRENGTHENED_BENDERS
+    algo.n_samples_primary = 3
     algo.secondary_cut_mode = CutModes.LAGRANGIAN
     algo.n_samples_secondary = 1
 
     algo.time_limit_minutes = time_limit_minutes
     algo.stop_stabilization_count = stop_stabilization_count
     algo.refinement_stabilization_count = refinement_stabilization_count
-    algo.n_samples_final_ub = 1
+    algo.n_samples_final_ub = 300
 
     # Execution
     try:

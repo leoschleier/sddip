@@ -25,10 +25,10 @@ def main():
     log_dir = log_manager.create_log_dir("log")
 
     # Dual solver
-    ds_tolerance = 10**-2
-    ds_max_iterations = 100
+    ds_tolerance = 10**-6
+    ds_max_iterations = 10000
     dual_solver = dualsolver.BundleMethod(
-        ds_max_iterations, ds_tolerance, log_dir
+        ds_max_iterations, ds_tolerance, log_dir, predicted_ascent="abs"
     )
 
     # Setup

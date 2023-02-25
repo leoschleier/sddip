@@ -1,4 +1,5 @@
 import logging
+import os
 from typing import Callable, List
 import argparse
 import datetime as dt
@@ -69,6 +70,9 @@ def _create_argument_parser() -> argparse.ArgumentParser:
 
 def _init_logging(verbose: bool = False):
     """Initialize the logging."""
+    if not os.path.exists(config.LOGS_DIR):
+        os.makedirs(config.LOGS_DIR)
+
     now_str = dt.datetime.now().strftime("%Y%m%d%H%M%S")
     log_file = config.LOGS_DIR / f"{now_str}_logs.txt"
 

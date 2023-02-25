@@ -8,8 +8,8 @@ logger = logging.getLogger(__name__)
 def main():
     # Parameters
     test_case = "case6ww"
-    n_stages = 8
-    n_realizations = 6
+    n_stages = 6
+    n_realizations = 3
 
     init_n_binaries = 6
     n_iterations = 100
@@ -26,7 +26,7 @@ def main():
 
     # Dual solver
     ds_tolerance = 10**-6
-    ds_max_iterations = 10000
+    ds_max_iterations = 5000
     dual_solver = dualsolver.BundleMethod(
         ds_max_iterations, ds_tolerance, log_dir, predicted_ascent="abs"
     )
@@ -41,7 +41,7 @@ def main():
     )
     algo.n_binaries = init_n_binaries
 
-    algo.big_m = 10**3
+    algo.big_m = 10**4
     algo.sos = False
 
     algo.primary_cut_mode = CutModes.STRENGTHENED_BENDERS

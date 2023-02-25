@@ -344,7 +344,7 @@ class BundleMethod(DualSolver):
 
         self.u_init = 1
         self.u_min = 0.1  # > 0
-        self.m_l = 0.1  # (0, 0.5)
+        self.m_l = 0.2  # (0, 0.5)
         self.m_r = 0.5  # (m_l, 1)
 
         self.predicted_ascent = predicted_ascent
@@ -433,12 +433,18 @@ class BundleMethod(DualSolver):
             )
 
             # Predicted ascent
-            delta = self._get_predicted_ascent(f_best, v.x)
+            delta = self._get_predicted_ascent(f_best, v.x)            
+
+            # Check stopping criterion
+            if delta <= self.tolerance:
+                tolerance_reached = True
+                break
 
             # Update lowest known gradient magnitude for logging purposes
             lowest_gm = min(lowest_gm, np.linalg.norm(np.array(subgradient)))
 
             serious_step = f_new - f_best >= self.m_l * delta
+
             # Weight update
             u, i_u, var_est = self.weight_update(
                 u,
@@ -476,11 +482,6 @@ class BundleMethod(DualSolver):
                 x_best = copy.copy(x_new)
                 f_best = copy.copy(f_new)
                 n_serious_steps += 1
-
-            # Check stopping criterion
-            if delta <= self.tolerance:
-                tolerance_reached = True
-                break
 
         stop_reason = "Tolerance" if tolerance_reached else "Max iterations"
 

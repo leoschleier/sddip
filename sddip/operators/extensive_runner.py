@@ -10,8 +10,8 @@ logger = logging.getLogger(__name__)
 def main():
 
     test_case_name = "case6ww"
-    n_stages = 8
-    n_realizations = 6
+    n_stages = 6
+    n_realizations = 3
 
     log_manager = sddip_logging.LogManager()
     log_dir = log_manager.create_log_dir(f"{test_case_name}_ext")

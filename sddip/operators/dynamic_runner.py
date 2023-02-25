@@ -8,10 +8,10 @@ logger = logging.getLogger(__name__)
 def main():
     # Parameters
     test_case = "case6ww"
-    n_stages = 6
+    n_stages = 8
     n_realizations = 3
 
-    init_n_binaries = 6
+    init_n_binaries = 5
     n_iterations = 100
     time_limit_minutes = 5 * 60
 

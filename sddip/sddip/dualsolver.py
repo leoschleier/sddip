@@ -323,7 +323,7 @@ class SubgradientMethod(DualSolver):
 
     def create_subgradient_log_dir(self, id: str):
         sg_dir = os.path.join(self.log_dir, f"{id}_subgradient")
-        os.mkdir(sg_dir)
+        os.makedirs(sg_dir)
         return dir
 
 

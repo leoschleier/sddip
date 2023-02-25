@@ -21,7 +21,7 @@ def main():
     )
 
     if not os.path.exists(test_case_scenario_dir):
-        os.mkdir(test_case_scenario_dir)
+        os.makedirs(test_case_scenario_dir)
 
     bus_file_path = os.path.join(test_case_raw_dir, "bus_data.txt")
     renewables_file_path = os.path.join(test_case_raw_dir, "ren_data.txt")

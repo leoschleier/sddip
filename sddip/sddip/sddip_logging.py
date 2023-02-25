@@ -15,13 +15,13 @@ class LogManager:
         now_str = datetime.today().strftime("%Y%m%d%H%M%S")
         dir_name = f"{dir_label}_{now_str}"
         log_dir = config.LOGS_DIR / dir_name
-        os.mkdir(log_dir)
+        os.makedirs(log_dir)
 
         return log_dir
 
     def create_subdirectory(self, dir_name: str, sub_dir_name: str):
         dir_to_create = dir_name / sub_dir_name
-        os.mkdir(dir_to_create)
+        os.makedirs(dir_to_create)
 
 
 class RuntimeLogger:
@@ -47,7 +47,7 @@ class RuntimeLogger:
 class GurobiLogger:
     def __init__(self, log_dir: str):
         self.gurobi_log_dir = os.path.join(log_dir, "gurobi")
-        os.mkdir(self.gurobi_log_dir)
+        os.makedirs(self.gurobi_log_dir)
 
     def log_model(self, model: gp.Model, label: str):
         model_file_path = os.path.join(

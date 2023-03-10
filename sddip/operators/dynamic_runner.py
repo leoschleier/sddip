@@ -9,7 +9,7 @@ def main():
     # Parameters
     test_case = "case6ww"
     n_stages = 8
-    n_realizations = 3
+    n_realizations = 6
     logger.info(
         "Test case: %s, T=%s, N=%s", test_case, n_stages, n_realizations
     )

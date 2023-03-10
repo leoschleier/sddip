@@ -10,6 +10,9 @@ def main():
     test_case = "case6ww"
     n_stages = 8
     n_realizations = 3
+    logger.info(
+        "Test case: %s, T=%s, N=%s", test_case, n_stages, n_realizations
+    )
 
     init_n_binaries = 5
     n_iterations = 100
@@ -56,9 +59,6 @@ def main():
 
     # Execution
     try:
-        logger.info(
-            "Test case: %s, T=%s, N=%s", test_case, n_stages, n_realizations
-        )
         algo.run(n_iterations)
     except KeyboardInterrupt:
         logger.warning("Shutdown request ... exiting")

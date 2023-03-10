@@ -53,6 +53,9 @@ def main():
 
     # Execution
     try:
+        logger.info(
+            "Test case: %s, T=%s, N=%s", test_case, n_stages, n_realizations
+        )
         algo.run(n_iterations)
     except KeyboardInterrupt:
         logger.warning("Shutdown request ... exiting")
@@ -72,7 +75,6 @@ def main():
                 algo.bc_storage.export_results(results_dir)
         except ValueError as ex:
             logger.error("Export incomplete: %s", ex)
-
 
 
 if __name__ == "__main__":

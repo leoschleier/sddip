@@ -2,7 +2,7 @@ import logging
 import gurobipy as gp
 
 from time import time
-from ..sddip import parameters, tree, logger
+from ..sddip import parameters, sddip_logging, tree
 
 logger = logging.getLogger(__name__)
 
@@ -10,12 +10,12 @@ logger = logging.getLogger(__name__)
 def main():
 
     test_case_name = "case6ww"
-    n_stages = 8
-    n_realizations = 6
+    n_stages = 6
+    n_realizations = 3
 
-    log_manager = logger.LogManager()
+    log_manager = sddip_logging.LogManager()
     log_dir = log_manager.create_log_dir(f"{test_case_name}_ext")
-    runtime_logger = logger.RuntimeLogger(log_dir)
+    runtime_logger = sddip_logging.RuntimeLogger(log_dir)
 
     runtime_logger.start()
 
@@ -30,9 +30,9 @@ def main():
     )
     logger.info(scenario_tree)
 
-    ########################################################################################################################
-    # Variables initialization
-    ########################################################################################################################
+    ####################################################################
+    # Variable initialization
+    ####################################################################
     model_building_start_time = time()
 
     model = gp.Model("MSUC")
@@ -105,9 +105,9 @@ def main():
 
     model.update()
 
-    ########################################################################################################################
+    ####################################################################
     # Objective and constraints
-    ########################################################################################################################
+    ####################################################################
 
     # Objective
     logger.info("Adding objective...")
@@ -308,7 +308,7 @@ def main():
                     -line_flows[l] <= params.pl_max[l] + delta[t, n]
                     for l in range(params.n_lines)
                 ),
-                f"power-flow(2)",
+                "power-flow(2)",
             )
 
     # Startup shutdown constraints
@@ -463,11 +463,11 @@ def main():
 
     # model.update()
 
-    runtime_logger.log_task_end(f"model_building", model_building_start_time)
+    runtime_logger.log_task_end("model_building", model_building_start_time)
 
-    ########################################################################################################################
+    ####################################################################
     # Solving procedure
-    ########################################################################################################################
+    ####################################################################
     model.setParam("OutputFlag", 1)
     model.setParam("TimeLimit", 5 * 60 * 60)
 
@@ -509,10 +509,10 @@ def main():
     # logger.info(soc[1, 2, 0].x)
 
     logger.info("Solving finished.")
-    logger.info(f"Status: {model.Status}")
-    logger.info(f"Optimal value: {obj.getValue()}")
-    logger.info(f"Total slack: {total_slack}")
-    logger.info(f"MIP gap: {model.MIPGap}")
+    logger.info("Status: %s", model.status)
+    logger.info("Optimal value: %s", obj.getValue())
+    logger.info("Total slack: %s", total_slack)
+    logger.info("MIP gap: %s", model.MIPGap)
 
     runtime_logger.log_experiment_end()
 

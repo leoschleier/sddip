@@ -27,13 +27,13 @@ class Parameters:
         scenario_file="scenario_data.txt",
     ):
         raw_data_dir = os.path.join(
-            config.test_cases_dir, test_case_name, raw_directory
+            config.TEST_CASES_DIR, test_case_name, raw_directory
         )
         scenario_str = (
             f"t{str(n_stages).zfill(2)}_n{str(n_realizations).zfill(2)}"
         )
         scenario_data_dir = os.path.join(
-            config.test_cases_dir, test_case_name, scenario_str
+            config.TEST_CASES_DIR, test_case_name, scenario_str
         )
 
         raw_data_importer = DataImporter(raw_data_dir)
@@ -153,9 +153,6 @@ class Parameters:
 
     def _init_deterministic_parameters(self):
         """Initializes all deterministic parameters"""
-        self.gen_cost_df
-        self.gen_df
-        self.branch_df
 
         gc_positive = np.where(self.gen_cost_df.c1 > 0, self.gen_cost_df.c1, 1)
         suc_positive = np.where(
@@ -167,9 +164,9 @@ class Parameters:
 
         costs_log10 = np.concatenate(
             [
-                np.log10(gc_positive),
-                np.log10(suc_positive),
-                np.log10(sdc_positive),
+                np.log(gc_positive) / np.log(100),
+                np.log(suc_positive) / np.log(100),
+                np.log(sdc_positive) / np.log(100),
                 np.zeros(1),
             ]
         )
@@ -198,17 +195,15 @@ class Parameters:
         self.eff_c = self.storage_df["Effc"].values.tolist()
         self.eff_dc = self.storage_df["Effdc"].values.tolist()
 
-        # TODO Adjust penalty for slack variables
-        self.penalty = 10**2
-
         self.cost_coeffs = (
-            self.gc.tolist()
-            + self.suc.tolist()
-            + self.sdc.tolist()
-            + [self.penalty] * 2
+            self.gc.tolist() + self.suc.tolist() + self.sdc.tolist()
         )
 
-        logger.info(f"Cost coefficients: {self.cost_coeffs}")
+        # Add penalty factor for slack variables
+        self.penalty = max(self.cost_coeffs) * 10
+        self.cost_coeffs += [self.penalty] * 2
+
+        logger.info("Cost coefficients: %s", self.cost_coeffs)
 
         self.pg_min = self.gen_df.Pmin.values.tolist()
         self.pg_max = self.gen_df.Pmax.values.tolist()

@@ -1,4 +1,5 @@
 import logging
+import os
 from typing import Callable, List
 import argparse
 import datetime as dt
@@ -19,7 +20,7 @@ def main(argv: List[str]):
     """Run the command line interface."""
     args = _parse_arguments(argv)
 
-    _init_logging()
+    _init_logging(args.verbose, args.clean)
     logger.info("Executing the SDDIP package.")
 
     run_func = _get_run_func(args)
@@ -67,8 +68,11 @@ def _create_argument_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def _init_logging(verbose: bool = False):
+def _init_logging(verbose: bool = False, no_files: bool = False):
     """Initialize the logging."""
+    if not os.path.exists(config.LOGS_DIR):
+        os.makedirs(config.LOGS_DIR)
+
     now_str = dt.datetime.now().strftime("%Y%m%d%H%M%S")
     log_file = config.LOGS_DIR / f"{now_str}_logs.txt"
 
@@ -77,10 +81,15 @@ def _init_logging(verbose: bool = False):
     else:
         log_level = logging.INFO
 
+    handlers = [logging.StreamHandler()]
+
+    if not no_files:
+        handlers.append(logging.FileHandler(log_file))
+
     logging.basicConfig(
         format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
         level=log_level,
-        handlers=[logging.StreamHandler(), logging.FileHandler(log_file)],
+        handlers=handlers,
     )
 
 

@@ -1,5 +1,6 @@
 from enum import Enum
 import logging
+import logging
 from time import time
 
 import gurobipy as gp
@@ -7,14 +8,13 @@ import numpy as np
 from scipy import linalg, stats
 
 from . import dualsolver
-from . import logger
+from . import sddip_logging
 from . import parameters
 from . import scenarios
 from . import storage
 from . import ucmodeldynamic
 from . import utils
 from .constants import ResultKeys
-from .dualsolver import DualSolverMethods
 
 logger = logging.getLogger(__name__)
 
@@ -35,7 +35,7 @@ class Algorithm:
         dual_solver: dualsolver.DualSolver,
     ):
         # Logger
-        self.runtime_logger = logger.RuntimeLogger(log_dir)
+        self.runtime_logger = sddip_logging.RuntimeLogger(log_dir)
 
         # Problem specific parameters
         self.problem_params = parameters.Parameters(
@@ -51,6 +51,7 @@ class Algorithm:
         self.no_improvement_tolerance = 10 ** (-8)
         self.stop_stabilization_count = 5
         self.refinement_stabilization_count = 2
+        self.big_m = 10**6
         self.big_m = 10**6
         self.sos = False
         self.time_limit_minutes = 5 * 60
@@ -144,7 +145,7 @@ class Algorithm:
             v_upper_l, v_upper_r = self.statistical_upper_bound(
                 v_opt_k, n_samples
             )
-            logger.info("Statistical upper bound: {} ".format(v_upper_l))
+            logger.info("Statistical upper bound: %s ", v_upper_l)
             self.runtime_logger.log_task_end(
                 f"upper_bound_i{i+1}", upper_bound_start_time
             )
@@ -176,7 +177,7 @@ class Algorithm:
             lower_bound_start_time = time()
             v_lower = self.lower_bound(i + 1)
             lower_bounds.append(v_lower)
-            logger.info("Lower bound: {} ".format(v_lower))
+            logger.info("Lower bound: %s", v_lower)
             self.runtime_logger.log_task_end(
                 f"lower_bound_i{i+1}", lower_bound_start_time
             )
@@ -367,7 +368,7 @@ class Algorithm:
             for prec in continuous_variables_precision
         ]
         logger.info(
-            f"Approximation errors: {continuous_variables_approx_error}"
+            "Approximation errors: %s", continuous_variables_approx_error
         )
 
     def select_cut_mode(self, iteration: int, lower_bounds: list):
@@ -498,9 +499,7 @@ class Algorithm:
                     )
 
                     _, dual_results = self.dual_solver.solve(
-                        uc_bw.model,
-                        objective_terms,
-                        relaxed_terms,
+                        uc_bw.model, objective_terms, relaxed_terms
                     )
                     dual_multipliers = dual_results.multipliers.tolist()
                     dual_value = dual_results.obj_value - np.array(

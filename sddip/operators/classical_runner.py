@@ -1,5 +1,5 @@
 import logging
-from ..sddip import dualsolver, logger, sddipclassical, storage
+from ..sddip import dualsolver, sddip_logging, sddipclassical, storage
 from ..sddip.sddipclassical import CutModes
 
 logger = logging.getLogger(__name__)
@@ -10,6 +10,9 @@ def main():
     test_case = "case6ww"
     n_stages = 8
     n_realizations = 6
+    logger.info(
+        "Test case: %s, T=%s, N=%s", test_case, n_stages, n_realizations
+    )
 
     init_n_binaries = 10
     n_iterations = 10
@@ -21,14 +24,14 @@ def main():
     refinement_stabilization_count = 1
 
     # Logger
-    log_manager = logger.LogManager()
+    log_manager = sddip_logging.LogManager()
     log_dir = log_manager.create_log_dir("log")
 
     # Dual solver
-    ds_tolerance = 10**-2
-    ds_max_iterations = 1000
+    ds_tolerance = 10**-6
+    ds_max_iterations = 10000
     dual_solver = dualsolver.BundleMethod(
-        ds_max_iterations, ds_tolerance, log_dir
+        ds_max_iterations, ds_tolerance, log_dir, predicted_ascent="abs"
     )
 
     # Setup
@@ -49,7 +52,7 @@ def main():
     algo.time_limit_minutes = time_limit_minutes
     algo.stop_stabilization_count = stop_stabilization_count
     algo.refinement_stabilization_count = refinement_stabilization_count
-    algo.n_samples_final_ub = 150
+    algo.n_samples_final_ub = 300
 
     # Execution
     try:
@@ -72,7 +75,6 @@ def main():
                 algo.bc_storage.export_results(results_dir)
         except ValueError as ex:
             logger.error("Export incomplete: %s", ex)
-
 
 
 if __name__ == "__main__":

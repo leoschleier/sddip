@@ -1,5 +1,6 @@
 from enum import Enum
 import logging
+import logging
 from time import time
 
 import gurobipy as gp
@@ -50,6 +51,7 @@ class Algorithm:
         self.no_improvement_tolerance = 10 ** (-8)
         self.stop_stabilization_count = 5
         self.refinement_stabilization_count = 2
+        self.big_m = 10**6
         self.big_m = 10**6
         self.sos = False
         self.time_limit_minutes = 5 * 60
@@ -497,9 +499,7 @@ class Algorithm:
                     )
 
                     _, dual_results = self.dual_solver.solve(
-                        uc_bw.model,
-                        objective_terms,
-                        relaxed_terms,
+                        uc_bw.model, objective_terms, relaxed_terms
                     )
                     dual_multipliers = dual_results.multipliers.tolist()
                     dual_value = dual_results.obj_value - np.array(

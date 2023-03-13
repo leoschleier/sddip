@@ -13,6 +13,20 @@ from . import sddip_logging
 logger = logging.getLogger(__name__)
 
 
+class SolverResults:
+    def __init__(self):
+        self.obj_value = None
+        self.multipliers = None
+        self.solver_time = None
+        self.n_iterations = None
+
+    def set_values(self, obj_value, multipliers, n_iterations, solver_time):
+        self.obj_value = obj_value
+        self.multipliers = multipliers
+        self.n_iterations = n_iterations
+        self.solver_time = solver_time
+
+
 class DualSolver(ABC):
     def __init__(
         self, max_iterations: int, tolerance: float, log_dir: str, tag: str
@@ -37,7 +51,7 @@ class DualSolver(ABC):
         self.results = SolverResults()
 
     @abstractmethod
-    def solve(self):
+    def solve(self, *args, **kwargs) -> Tuple[gp.Model, SolverResults]:
         """Solve the dual problem."""
 
     def get_subgradient_and_value(
@@ -104,20 +118,6 @@ class DualSolver(ABC):
         self.runtime_logger.log_task_end(
             f"{self.tag}_{self.n_calls}", self.start_time
         )
-
-
-class SolverResults:
-    def __init__(self):
-        self.obj_value = None
-        self.multipliers = None
-        self.solver_time = None
-        self.n_iterations = None
-
-    def set_values(self, obj_value, multipliers, n_iterations, solver_time):
-        self.obj_value = obj_value
-        self.multipliers = multipliers
-        self.n_iterations = n_iterations
-        self.solver_time = solver_time
 
 
 class SubgradientMethod(DualSolver):
@@ -433,7 +433,7 @@ class BundleMethod(DualSolver):
             )
 
             # Predicted ascent
-            delta = self._get_predicted_ascent(f_best, v.x)            
+            delta = self._get_predicted_ascent(f_best, v.x)
 
             # Check stopping criterion
             if delta <= self.tolerance:

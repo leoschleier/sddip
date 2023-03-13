@@ -19,6 +19,9 @@ from .constants import ResultKeys
 logger = logging.getLogger(__name__)
 
 
+logger = logging.getLogger(__name__)
+
+
 class CutModes(Enum):
     BENDERS = "b"
     STRENGTHENED_BENDERS = "sb"

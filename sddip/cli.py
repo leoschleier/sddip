@@ -29,12 +29,12 @@ def main(argv: List[str]):
     else:
         execution_successful = _execute_aux_func(args)
 
-    if not execution_successful:
-        logger.warning(
-            "Abort execution. "
-            "Unknown combination of command line arguments: %s",
-            args,
-        )
+        if not execution_successful:
+            logger.warning(
+                "Abort execution. "
+                "Unknown combination of command line arguments: %s",
+                args,
+            )
 
     logger.info("Job completed")
 

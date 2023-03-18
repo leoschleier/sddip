@@ -1,6 +1,6 @@
 import logging
 import os
-from typing import Callable, List
+from typing import Callable, List, Union
 import argparse
 import datetime as dt
 from . import config
@@ -108,7 +108,7 @@ def _init_logging(verbose: bool = False, no_files: bool = False):
     )
 
 
-def _get_run_func(args: argparse.Namespace) -> Callable | None:
+def _get_run_func(args: argparse.Namespace) -> Union[Callable, None]:
     """Return the function to run based on the command line arguments."""
     if args.classical:
         return classical_runner.main

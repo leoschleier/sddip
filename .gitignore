@@ -134,3 +134,7 @@ data/03_logs/*
 
 # VSCode
 .vscode
+
+# Gurobi files
+*.lp
+*.ilp

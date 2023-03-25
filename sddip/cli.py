@@ -3,6 +3,7 @@ import os
 from typing import Callable, List, Union
 import argparse
 import datetime as dt
+
 from . import config
 
 from .operators import classical_runner, dynamic_runner, extensive_runner
@@ -10,6 +11,7 @@ from .scripts import (
     clear_result_directories,
     create_scenarios,
     create_supplementary,
+    gather_latest_results,
 )
 
 
@@ -76,6 +78,7 @@ def _create_argument_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--verbose", action="store_true", help="Enable verbose logging"
     )
+    parser.add_argument("--gather", action="store_true", help="Gather results")
     parser.add_argument("-t", type=int, required=False, default=None)
     parser.add_argument("-n", type=int, required=False, default=None)
     parser.add_argument("--test-case", type=str, required=False, default=None)
@@ -141,7 +144,10 @@ def _execute_aux_func(args: argparse.Namespace) -> bool:
             )
             execution_successful = True
         elif args.clean:
-            clear_result_directories.main
+            clear_result_directories.main()
             execution_successful = True
+    elif args.gather:
+        gather_latest_results.main()
+        execution_successful = True
 
     return execution_successful

@@ -5,7 +5,7 @@ import shutil
 
 
 def main():
-    n = 1
+    n = 3
 
     log_files = config.LOGS_DIR.glob("*.txt")
     runtime_log_dirs = config.LOGS_DIR.glob("./log_*")
@@ -19,6 +19,7 @@ def main():
 
     working_dir = Path.cwd()
     temp_dir = working_dir / "temp"
+    
     for log, rt, bm, res in zip(
         latest_log_files,
         latest_runtime_log_dirs,
@@ -38,7 +39,7 @@ def main():
 
 
 def get_last(n: int, l: Iterable) -> list:
-    last_n = list(l)[-n]
+    last_n = list(l)[-n:]
     if type(last_n) == list:
         return last_n
     else:

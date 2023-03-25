@@ -4,15 +4,10 @@ from ..sddip.sddipdynamic import CutModes
 
 logger = logging.getLogger(__name__)
 
-logger = logging.getLogger(__name__)
-
-logger = logging.getLogger(__name__)
-
-
 def main():
     # Parameters
-    test_case = "case6ww"
-    n_stages = 8
+    test_case = "WB5"
+    n_stages = 6
     n_realizations = 6
     n_nodes = (n_realizations**n_stages - 1) // (n_realizations - 1)
     logger.info(
@@ -39,7 +34,7 @@ def main():
     dual_solver = dualsolver.BundleMethod(
         ds_max_iterations, ds_tolerance, log_dir, predicted_ascent="abs"
     )
-
+    
     # Setup
     algo = sddipdynamic.Algorithm(
         test_case,

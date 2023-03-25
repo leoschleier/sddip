@@ -150,6 +150,6 @@ def _execute_aux_func(args: argparse.Namespace) -> bool:
             execution_successful = True
     elif args.gather:
         gather_latest_results.main()
-            execution_successful = True
+        execution_successful = True
 
     return execution_successful

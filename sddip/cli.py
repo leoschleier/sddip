@@ -18,11 +18,13 @@ from .scripts import (
 logger = logging.getLogger(__name__)
 
 
+
 def main(argv: List[str]):
     """Run the command line interface."""
     args = _parse_arguments(argv)
 
-    _init_logging(args.verbose, args.clean)
+    no_files = args.clean or args.gather
+    _init_logging(args.verbose, no_files)
     logger.info("Executing the SDDIP package.")
 
     run_func = _get_run_func(args)
@@ -148,6 +150,6 @@ def _execute_aux_func(args: argparse.Namespace) -> bool:
             execution_successful = True
     elif args.gather:
         gather_latest_results.main()
-        execution_successful = True
+            execution_successful = True
 
     return execution_successful

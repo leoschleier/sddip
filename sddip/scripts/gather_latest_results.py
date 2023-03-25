@@ -1,6 +1,6 @@
 from pathlib import Path
 from typing import Iterable
-import config
+from .. import config
 import shutil
 
 
@@ -19,7 +19,6 @@ def main():
 
     working_dir = Path.cwd()
     temp_dir = working_dir / "temp"
-
     for log, rt, bm, res in zip(
         latest_log_files,
         latest_runtime_log_dirs,

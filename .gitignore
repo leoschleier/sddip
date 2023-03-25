@@ -138,3 +138,6 @@ data/03_logs/*
 # Gurobi files
 *.lp
 *.ilp
+
+# Temp directory
+/temp

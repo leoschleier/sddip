@@ -145,11 +145,11 @@ def _execute_aux_func(args: argparse.Namespace) -> bool:
                 args.test_case, args.t, args.n
             )
             execution_successful = True
-        elif args.clean:
-            clear_result_directories.main()
-            execution_successful = True
     elif args.gather:
         gather_latest_results.main()
+        execution_successful = True
+    elif args.clean:
+        clear_result_directories.main()
         execution_successful = True
 
     return execution_successful

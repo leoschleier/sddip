@@ -1,8 +1,9 @@
 import logging
 import os
-from typing import Callable, List
+from typing import Callable, List, Union
 import argparse
 import datetime as dt
+
 from . import config
 
 from .operators import classical_runner, dynamic_runner, extensive_runner
@@ -10,21 +11,36 @@ from .scripts import (
     clear_result_directories,
     create_scenarios,
     create_supplementary,
+    gather_latest_results,
 )
 
 
 logger = logging.getLogger(__name__)
 
 
+
 def main(argv: List[str]):
     """Run the command line interface."""
     args = _parse_arguments(argv)
 
-    _init_logging(args.verbose, args.clean)
+    no_files = args.clean or args.gather
+    _init_logging(args.verbose, no_files)
     logger.info("Executing the SDDIP package.")
 
     run_func = _get_run_func(args)
-    run_func()
+    if run_func:
+        run_func()
+    else:
+        execution_successful = _execute_aux_func(args)
+
+        if not execution_successful:
+            logger.warning(
+                "Abort execution. "
+                "Unknown combination of command line arguments: %s",
+                args,
+            )
+
+    logger.info("Job completed")
 
 
 def _parse_arguments(argv: List[str]) -> argparse.Namespace:
@@ -64,6 +80,10 @@ def _create_argument_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--verbose", action="store_true", help="Enable verbose logging"
     )
+    parser.add_argument("--gather", action="store_true", help="Gather results")
+    parser.add_argument("-t", type=int, required=False, default=None)
+    parser.add_argument("-n", type=int, required=False, default=None)
+    parser.add_argument("--test-case", type=str, required=False, default=None)
 
     return parser
 
@@ -93,7 +113,7 @@ def _init_logging(verbose: bool = False, no_files: bool = False):
     )
 
 
-def _get_run_func(args: argparse.Namespace) -> Callable:
+def _get_run_func(args: argparse.Namespace) -> Union[Callable, None]:
     """Return the function to run based on the command line arguments."""
     if args.classical:
         return classical_runner.main
@@ -101,11 +121,35 @@ def _get_run_func(args: argparse.Namespace) -> Callable:
         return dynamic_runner.main
     elif args.extensive:
         return extensive_runner.main
-    elif args.scenarios:
-        return create_scenarios.main
-    elif args.supplementary:
-        return create_supplementary.main
-    elif args.clean:
-        return clear_result_directories.main
     else:
-        return dynamic_runner.main
+        return None
+
+
+def _execute_aux_func(args: argparse.Namespace) -> bool:
+    """Execute one of the auxilliary functions if correctly specified in
+    the command line arguments.
+    """
+    execution_successful = False
+    if (
+        args.t is not None
+        and args.n is not None
+        and args.test_case is not None
+    ):
+        if args.scenarios:
+            create_scenarios.create_scenario_data(
+                args.test_case, args.t, args.n
+            )
+            execution_successful = True
+        elif args.supplementary:
+            create_supplementary.create_supplementary_data(
+                args.test_case, args.t, args.n
+            )
+            execution_successful = True
+    elif args.gather:
+        gather_latest_results.main()
+        execution_successful = True
+    elif args.clean:
+        clear_result_directories.main()
+        execution_successful = True
+
+    return execution_successful

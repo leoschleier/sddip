@@ -4,13 +4,7 @@ import pandas as pd
 from .. import config
 
 
-def main():
-    # TODO Select parameters for data generation
-    test_case = "case6ww"
-
-    t = 8
-    n = 6
-
+def create_supplementary_data(test_case: str, t: int, n: int):
     scenario_str = f"t{str(t).zfill(2)}_n{str(n).zfill(2)}"
 
     # Ramp rate
@@ -20,9 +14,9 @@ def main():
     up_down_factor = 4
 
     # Parameter retrieval
-    test_case_raw_dir = os.path.join(config.test_cases_dir, test_case, "raw")
+    test_case_raw_dir = os.path.join(config.TEST_CASES_DIR, test_case, "raw")
     test_case_scenario_dir = os.path.join(
-        config.test_cases_dir, test_case, scenario_str
+        config.TEST_CASES_DIR, test_case, scenario_str
     )
 
     gen_file = os.path.join(test_case_raw_dir, "gen_data.txt")
@@ -61,7 +55,3 @@ def main():
     supplementary_df = pd.DataFrame.from_dict(supplementary_dict)
 
     supplementary_df.to_csv(supplementary_file_path, sep="\t", index=False)
-
-
-if __name__ == "__main__":
-    main()

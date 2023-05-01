@@ -10,9 +10,11 @@ def main():
     test_case = "case6ww"
     n_stages = 8
     n_realizations = 6
+    n_nodes = (n_realizations**n_stages - 1) // (n_realizations - 1)
     logger.info(
         "Test case: %s, T=%s, N=%s", test_case, n_stages, n_realizations
     )
+    logger.info("Total number of nodes: %s", n_nodes)
 
     init_n_binaries = 10
     n_iterations = 10

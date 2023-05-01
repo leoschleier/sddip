@@ -55,7 +55,3 @@ def create_supplementary_data(test_case: str, t: int, n: int):
     supplementary_df = pd.DataFrame.from_dict(supplementary_dict)
 
     supplementary_df.to_csv(supplementary_file_path, sep="\t", index=False)
-
-
-if __name__ == "__main__":
-    main()

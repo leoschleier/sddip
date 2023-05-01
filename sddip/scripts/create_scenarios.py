@@ -68,7 +68,3 @@ def create_scenario_data(test_case: str, t: int, n: int):
     )
 
     scenario_df.to_csv(scenario_file_path, sep="\t", index=False)
-
-
-if __name__ == "__main__":
-    main()

@@ -5,7 +5,7 @@ import shutil
 
 
 def main():
-    n = 3
+    n = 1
 
     log_files = config.LOGS_DIR.glob("*.txt")
     runtime_log_dirs = config.LOGS_DIR.glob("./log_*")

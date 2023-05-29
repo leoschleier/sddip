@@ -8,7 +8,7 @@ logger = logging.getLogger(__name__)
 
 def main():
     # Parameters
-    test_case = "case30"
+    test_case = "case14"
     n_stages = 8
     n_realizations = 6
     n_nodes = (n_realizations**n_stages - 1) // (n_realizations - 1)

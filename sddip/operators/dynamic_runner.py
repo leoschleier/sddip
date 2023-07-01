@@ -1,8 +1,10 @@
 import logging
-from ..sddip import sddip_logging, sddipdynamic, storage, dualsolver
+
+from ..sddip import dualsolver, sddip_logging, sddipdynamic, storage
 from ..sddip.sddipdynamic import CutModes
 
 logger = logging.getLogger(__name__)
+
 
 def main():
     # Parameters
@@ -32,9 +34,13 @@ def main():
     ds_tolerance = 10**-6
     ds_max_iterations = 5000
     dual_solver = dualsolver.BundleMethod(
-        ds_max_iterations, ds_tolerance, log_dir, predicted_ascent="abs"
+        ds_max_iterations,
+        ds_tolerance,
+        log_dir,
+        predicted_ascent="abs",
+        time_limit=5 * 60,
     )
-    
+
     # Setup
     algo = sddipdynamic.Algorithm(
         test_case,

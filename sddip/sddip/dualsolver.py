@@ -78,7 +78,13 @@ class DualSolver(ABC):
         model.optimize()
 
         if time_limit is not None:
-            model.setParam("TimeLimit", time_limit * 60)
+            model.setParam(
+                "TimeLimit",
+                max(time_limit * 60, 10)
+                # Ensure that Gurobi has enough time to find at least a
+                # feasible point. Otherwise, retrieving the variable
+                # values would fail.
+            )
         else:
             model.setParam("TimeLimit", gp.GRB.INFINITY)
 
@@ -456,7 +462,13 @@ class BundleMethod(DualSolver):
             subproblem.addConstr(v <= new_plane, name=f"{i+1}")
             subproblem.update()
 
-            subproblem.setParam("TimeLimit", time_remaining)
+            subproblem.setParam(
+                "TimeLimit",
+                max(time_remaining, 10)
+                # Ensure that Gurobi has enough time to find at least a
+                # feasible point. Otherwise, retrieving the variable
+                # values would fail.
+            )
 
             # Solve subproblem
             subproblem.optimize()

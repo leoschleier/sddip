@@ -1,4 +1,5 @@
 import logging
+
 from ..sddip import dualsolver, sddip_logging, sddipclassical, storage
 from ..sddip.sddipclassical import CutModes
 
@@ -33,7 +34,11 @@ def main():
     ds_tolerance = 10**-6
     ds_max_iterations = 10000
     dual_solver = dualsolver.BundleMethod(
-        ds_max_iterations, ds_tolerance, log_dir, predicted_ascent="abs"
+        ds_max_iterations,
+        ds_tolerance,
+        log_dir,
+        predicted_ascent="abs",
+        time_limit=5 * 60,
     )
 
     # Setup
@@ -46,8 +51,8 @@ def main():
     )
     algo.n_binaries = init_n_binaries
 
-    algo.primary_cut_mode = CutModes.LAGRANGIAN
-    algo.n_samples_primary = 1
+    algo.primary_cut_mode = CutModes.STRENGTHENED_BENDERS
+    algo.n_samples_primary = 3
     algo.secondary_cut_mode = CutModes.LAGRANGIAN
     algo.n_samples_secondary = 1
 

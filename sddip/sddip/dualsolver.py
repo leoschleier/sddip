@@ -1,8 +1,8 @@
 import copy
 import logging
 import os
+import time
 from abc import ABC, abstractmethod
-from time import time
 from typing import Optional, Tuple
 
 import gurobipy as gp
@@ -55,7 +55,12 @@ class DualSolver(ABC):
         """Solve the dual problem."""
 
     def get_subgradient_and_value(
-        self, model, objective_terms, relaxed_terms, dual_multipliers
+        self,
+        model,
+        objective_terms,
+        relaxed_terms,
+        dual_multipliers,
+        time_limit: Optional[float] = None,
     ) -> Tuple[np.ndarray, float]:
         """Compute the subgradient and the objective value of the dual
         problem.
@@ -71,6 +76,17 @@ class DualSolver(ABC):
         model.update()
 
         model.optimize()
+
+        if time_limit is not None:
+            model.setParam(
+                "TimeLimit",
+                max(time_limit * 60, 10)
+                # Ensure that Gurobi has enough time to find at least a
+                # feasible point. Otherwise, retrieving the variable
+                # values would fail.
+            )
+        else:
+            model.setParam("TimeLimit", gp.GRB.INFINITY)
 
         self.solver_time += model.Runtime
 
@@ -112,7 +128,7 @@ class DualSolver(ABC):
         )
 
     def log_task_start(self):
-        self.start_time = time()
+        self.start_time = time.time()
 
     def log_task_end(self):
         self.runtime_logger.log_task_end(
@@ -121,7 +137,6 @@ class DualSolver(ABC):
 
 
 class SubgradientMethod(DualSolver):
-
     TAG = "SG"
 
     def __init__(
@@ -149,7 +164,6 @@ class SubgradientMethod(DualSolver):
         optimal_value_estimate: float = None,
         log_id: str = None,
     ) -> Tuple[gp.Model, SolverResults]:
-
         self.on_solver_call()
         model.setParam("OutputFlag", 0)
 
@@ -177,7 +191,6 @@ class SubgradientMethod(DualSolver):
         logger.debug("Subgradient Method started")
 
         for j in range(self.max_iterations):
-
             # Optimize
             subgradient, opt_value = self.get_subgradient_and_value(
                 model, objective_terms, relaxed_terms, dual_multipliers
@@ -254,7 +267,6 @@ class SubgradientMethod(DualSolver):
         function_value: float = None,
         opt_value_estimate: float = None,
     ):
-
         step_size = None
         gradient_magnitude = (
             np.linalg.norm(gradient, 2) if any(gradient) else None
@@ -309,7 +321,6 @@ class SubgradientMethod(DualSolver):
         dual_multipliers: list,
         subgradient: list,
     ):
-
         logger.debug("Iteration %s:", iteration)
 
         logger.debug("Dual multipliers: %s", dual_multipliers)
@@ -328,7 +339,6 @@ class SubgradientMethod(DualSolver):
 
 
 class BundleMethod(DualSolver):
-
     TAG = "BM"
     ABS_PREDICTED_ASCENT = "abs"
     REL_PREDICTED_ASCENT = "rel"
@@ -339,8 +349,35 @@ class BundleMethod(DualSolver):
         tolerance: float,
         log_dir: str,
         predicted_ascent="abs",
+        time_limit: Optional[float] = None,
     ):
+        """Initialize Bundle Method
+
+        Parameters
+        ----------
+        max_iterations : int
+            Maximum number of iterations
+        tolerance : float
+            Stop tolerance. The bundle method stops if the predicted
+            ascent is less or equal to the tolerance.
+        log_dir : str
+            Directory to save log files
+        predicted_ascent : str, optional
+            Method for calculating the predicted ascent ('abs' or
+            'rel').
+            relative), by default "abs"
+        time_limit : Optional[float], optional
+            Time limit in seconds after which the bundle method is being
+            interrupted, by default None
+
+        Raises
+        ------
+        ValueError
+            If predicted_ascent is not 'abs' or 'rel'
+        """
         super().__init__(max_iterations, tolerance, log_dir, self.TAG)
+
+        self._time_limit = time_limit
 
         self.u_init = 1
         self.u_min = 0.1  # > 0
@@ -377,13 +414,16 @@ class BundleMethod(DualSolver):
         self, model: gp.Model, objective_terms, relaxed_terms
     ) -> Tuple[gp.Model, SolverResults]:
         """Solve the dual problem using the bundle method."""
-
         logger.debug("Bundle method started")
+        start_time = time.time()
+        time_remaining = self._time_limit
 
         self.on_solver_call()
         model.setParam("OutputFlag", 0)
 
         tolerance_reached = False
+        time_limit_reached = False
+
         u = self.u_init
         i_u = 0
         var_est = 10**9
@@ -408,8 +448,9 @@ class BundleMethod(DualSolver):
         subproblem, v, x = self.create_subproblem(gradient_len)
 
         for i in range(self.max_iterations):
-
             # Add new plane to subproblem
+            time_remaining = self._get_time_remaining(start_time)
+
             new_plane = f_new + gp.quicksum(
                 subgradient[j] * (x[j] - x_new[j]) for j in range(gradient_len)
             )
@@ -421,15 +462,24 @@ class BundleMethod(DualSolver):
             subproblem.addConstr(v <= new_plane, name=f"{i+1}")
             subproblem.update()
 
+            subproblem.setParam(
+                "TimeLimit",
+                max(time_remaining, 10)
+                # Ensure that Gurobi has enough time to find at least a
+                # feasible point. Otherwise, retrieving the variable
+                # values would fail.
+            )
+
             # Solve subproblem
             subproblem.optimize()
 
             # Candidate dual multipliers
             x_new = [x[j].x for j in range(gradient_len)]
 
+            time_remaining = self._get_time_remaining(start_time)
             # Candidate optimal value
             subgradient, f_new = self.get_subgradient_and_value(
-                model, objective_terms, relaxed_terms, x_new
+                model, objective_terms, relaxed_terms, x_new, time_remaining
             )
 
             # Predicted ascent
@@ -438,6 +488,9 @@ class BundleMethod(DualSolver):
             # Check stopping criterion
             if delta <= self.tolerance:
                 tolerance_reached = True
+                break
+            elif time.time() - start_time >= self._time_limit:
+                time_limit_reached = True
                 break
 
             # Update lowest known gradient magnitude for logging purposes
@@ -483,7 +536,9 @@ class BundleMethod(DualSolver):
                 f_best = copy.copy(f_new)
                 n_serious_steps += 1
 
-        stop_reason = "Tolerance" if tolerance_reached else "Max iterations"
+        stop_reason = self._get_stop_reason(
+            tolerance_reached, time_limit_reached
+        )
 
         self.log_task_end()
 
@@ -575,3 +630,19 @@ class BundleMethod(DualSolver):
             name="x",
         )
         return subproblem, v, x
+
+    def _get_stop_reason(
+        self, tolerance_reached: bool, time_limit_reached: bool
+    ) -> str:
+        """Get the reason for stopping the bundle method."""
+        if tolerance_reached:
+            stop_reason = "Tolerance"
+        elif time_limit_reached:
+            stop_reason = "Time limit"
+        else:
+            stop_reason = "Max iterations"
+        return stop_reason
+
+    def _get_time_remaining(self, start_time: float) -> float:
+        """Get the time remaining for the bundle method."""
+        return max(self._time_limit - (time.time() - start_time), 0)

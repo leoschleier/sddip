@@ -1,5 +1,28 @@
 [tool.black]
 line-length = 79
+force-exclude = '''
+/(
+   \.direnv
+  |\.eggs
+  |\.git
+  |\.hg
+  |\.mypy_cache
+  |\.nox
+  |\.tox
+  |\.venv
+  |venv
+  |\.svn
+  |\.ipynb_checkpoints
+  |_build
+  |buck-out
+  |build
+  |dist
+  |__pypackages__
+)/
+'''
 
 [tool.isort]
 profile = "black"
+
+[tool.pylint.'MESSAGES CONTROL']
+max-line-length = 79

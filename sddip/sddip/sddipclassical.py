@@ -1,20 +1,21 @@
-from enum import Enum
 import logging
+from enum import Enum
 from time import time
 
 import gurobipy as gp
 import numpy as np
 from scipy import linalg, stats
 
-from . import dualsolver
-from . import sddip_logging
-from . import parameters
-from . import scenarios
-from . import storage
-from . import ucmodelclassical
-from . import utils
+from . import (
+    dualsolver,
+    parameters,
+    scenarios,
+    sddip_logging,
+    storage,
+    ucmodelclassical,
+    utils,
+)
 from .constants import ResultKeys
-
 
 logger = logging.getLogger(__name__)
 
@@ -109,7 +110,9 @@ class Algorithm:
         y_bin_multipliers = []
         self.y_0_bin = []
         for p_max, p_init in zip(
-            self.problem_params.pg_max, self.problem_params.init_y_trial_point
+            self.problem_params.pg_max,
+            self.problem_params.init_y_trial_point,
+            strict=False,
         ):
             y_bin_multipliers.append(
                 self.binarizer.calc_binary_multipliers_from_n_binaries(
@@ -134,6 +137,7 @@ class Algorithm:
         for s_max, soc_init in zip(
             self.problem_params.soc_max,
             self.problem_params.init_soc_trial_point,
+            strict=False,
         ):
             soc_bin_multipliers.append(
                 self.binarizer.calc_binary_multipliers_from_n_binaries(
@@ -237,7 +241,7 @@ class Algorithm:
             lower_bound_start_time = time()
             v_lower = self.lower_bound(i + 1)
             lower_bounds.append(v_lower)
-            logger.info("Lower bound: {} ".format(v_lower))
+            logger.info(f"Lower bound: {v_lower} ")
             self.runtime_logger.log_task_end(
                 f"lower_bound_i{i+1}", lower_bound_start_time
             )
@@ -304,8 +308,9 @@ class Algorithm:
             soc_trial_point = self.soc_0_bin
 
             v_opt_k.append(0)
-            for t, n in zip(range(self.problem_params.n_stages), samples[k]):
-
+            for t, n in zip(
+                range(self.problem_params.n_stages), samples[k], strict=False
+            ):
                 y_binary_trial_multipliers = linalg.block_diag(
                     *self.bin_multipliers["y"]
                 )
@@ -782,7 +787,6 @@ class Algorithm:
         realization: int,
         iteration: int,
     ) -> ucmodelclassical.ClassicalModel:
-
         model_builder.add_objective(self.problem_params.cost_coeffs)
 
         model_builder.add_balance_constraints(

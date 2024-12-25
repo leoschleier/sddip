@@ -1,5 +1,7 @@
 import logging
-import os, shutil
+import os
+import shutil
+
 from .. import config
 
 logger = logging.getLogger(__name__)

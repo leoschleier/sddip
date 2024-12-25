@@ -1,19 +1,20 @@
+import logging
 from enum import Enum
-import logging
-import logging
 from time import time
 
 import gurobipy as gp
 import numpy as np
 from scipy import linalg, stats
 
-from . import dualsolver
-from . import sddip_logging
-from . import parameters
-from . import scenarios
-from . import storage
-from . import ucmodeldynamic
-from . import utils
+from . import (
+    dualsolver,
+    parameters,
+    scenarios,
+    sddip_logging,
+    storage,
+    ucmodeldynamic,
+    utils,
+)
 from .constants import ResultKeys
 
 logger = logging.getLogger(__name__)
@@ -244,8 +245,9 @@ class Algorithm:
             soc_trial_point = self.problem_params.init_soc_trial_point
 
             v_opt_k.append(0)
-            for t, n in zip(range(self.problem_params.n_stages), samples[k]):
-
+            for t, n in zip(
+                range(self.problem_params.n_stages), samples[k], strict=False
+            ):
                 # Create forward model
                 uc_fw = ucmodeldynamic.ForwardModelBuilder(
                     self.problem_params.n_buses,
@@ -715,7 +717,6 @@ class Algorithm:
         realization: int,
         iteration: int,
     ) -> ucmodeldynamic.ModelBuilder:
-
         model_builder.add_objective(self.problem_params.cost_coeffs)
 
         model_builder.add_balance_constraints(

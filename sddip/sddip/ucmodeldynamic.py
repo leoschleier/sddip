@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+
 import gurobipy as gp
 import numpy as np
 from scipy import linalg
@@ -80,7 +81,6 @@ class ModelBuilder(ABC):
         self.initialize_copy_variables()
 
     def initialize_variables(self):
-
         for g in range(self.n_generators):
             self.x.append(
                 self.model.addVar(
@@ -88,7 +88,9 @@ class ModelBuilder(ABC):
                 )
             )
             self.y.append(
-                self.model.addVar(vtype=gp.GRB.CONTINUOUS, lb=0, name="y_%i" % (g + 1))
+                self.model.addVar(
+                    vtype=gp.GRB.CONTINUOUS, lb=0, name="y_%i" % (g + 1)
+                )
             )
             self.x_bs.append(
                 [
@@ -135,16 +137,24 @@ class ModelBuilder(ABC):
             )
         for s in range(self.n_storages):
             self.ys_c.append(
-                self.model.addVar(vtype=gp.GRB.CONTINUOUS, lb=0, name=f"y_c_{s+1}")
+                self.model.addVar(
+                    vtype=gp.GRB.CONTINUOUS, lb=0, name=f"y_c_{s+1}"
+                )
             )
             self.ys_dc.append(
-                self.model.addVar(vtype=gp.GRB.CONTINUOUS, lb=0, name=f"y_dc_{s+1}")
+                self.model.addVar(
+                    vtype=gp.GRB.CONTINUOUS, lb=0, name=f"y_dc_{s+1}"
+                )
             )
             self.u_c_dc.append(
-                self.model.addVar(vtype=self.bin_type, lb=0, ub=1, name=f"u_{s+1}")
+                self.model.addVar(
+                    vtype=self.bin_type, lb=0, ub=1, name=f"u_{s+1}"
+                )
             )
             self.soc.append(
-                self.model.addVar(vtype=gp.GRB.CONTINUOUS, lb=0, name=f"soc_{s+1}")
+                self.model.addVar(
+                    vtype=gp.GRB.CONTINUOUS, lb=0, name=f"soc_{s+1}"
+                )
             )
             self.socs_p.append(
                 self.model.addVar(vtype=gp.GRB.CONTINUOUS, lb=0, name="socs_p")
@@ -155,9 +165,15 @@ class ModelBuilder(ABC):
         self.theta = self.model.addVar(
             vtype=gp.GRB.CONTINUOUS, lb=-gp.GRB.INFINITY, name="theta"
         )
-        self.ys_p = self.model.addVar(vtype=gp.GRB.CONTINUOUS, lb=0, name="ys_p")
-        self.ys_n = self.model.addVar(vtype=gp.GRB.CONTINUOUS, lb=0, name="ys_n")
-        self.delta = self.model.addVar(vtype=gp.GRB.CONTINUOUS, lb=0, name="delta")
+        self.ys_p = self.model.addVar(
+            vtype=gp.GRB.CONTINUOUS, lb=0, name="ys_p"
+        )
+        self.ys_n = self.model.addVar(
+            vtype=gp.GRB.CONTINUOUS, lb=0, name="ys_n"
+        )
+        self.delta = self.model.addVar(
+            vtype=gp.GRB.CONTINUOUS, lb=0, name="delta"
+        )
         self.model.update()
         # self.model.addConstr(self.delta == 0)
         # self.model.addConstrs(self.socs_p[s] == 0 for s in range(self.n_storages))
@@ -166,22 +182,29 @@ class ModelBuilder(ABC):
     def initialize_copy_variables(self):
         for g in range(self.n_generators):
             self.z_x.append(
-                self.model.addVar(vtype=gp.GRB.CONTINUOUS, name="z_x_%i" % (g + 1),)
+                self.model.addVar(
+                    vtype=gp.GRB.CONTINUOUS, name="z_x_%i" % (g + 1)
+                )
             )
             self.z_y.append(
-                self.model.addVar(vtype=gp.GRB.CONTINUOUS, name="z_y_%i" % (g + 1),)
+                self.model.addVar(
+                    vtype=gp.GRB.CONTINUOUS, name="z_y_%i" % (g + 1)
+                )
             )
             self.z_x_bs.append(
                 [
                     self.model.addVar(
-                        vtype=gp.GRB.CONTINUOUS, name="z_x_bs_%i_%i" % (g + 1, k + 1),
+                        vtype=gp.GRB.CONTINUOUS,
+                        name="z_x_bs_%i_%i" % (g + 1, k + 1),
                     )
                     for k in range(self.backsight_periods[g])
                 ]
             )
         for s in range(self.n_storages):
             self.z_soc.append(
-                self.model.addVar(vtype=gp.GRB.CONTINUOUS, name="z_soc_%i" % (s + 1),)
+                self.model.addVar(
+                    vtype=gp.GRB.CONTINUOUS, name="z_soc_%i" % (s + 1)
+                )
             )
         self.model.update()
 
@@ -196,7 +219,9 @@ class ModelBuilder(ABC):
         penalty = coefficients[-1]
 
         coefficients = (
-            coefficients + [penalty] * (2 * self.n_storages + 2 * len(x_bs_p) + 1) + [1]
+            coefficients
+            + [penalty] * (2 * self.n_storages + 2 * len(x_bs_p) + 1)
+            + [1]
         )
 
         variables = (
@@ -235,7 +260,9 @@ class ModelBuilder(ABC):
         )
         self.update_model()
 
-    def add_generator_constraints(self, min_generation: list, max_generation: list):
+    def add_generator_constraints(
+        self, min_generation: list, max_generation: list
+    ):
         self.model.addConstrs(
             (
                 self.y[g] >= min_generation[g] * self.x[g] - self.delta
@@ -272,7 +299,10 @@ class ModelBuilder(ABC):
         )
 
         self.model.addConstrs(
-            (self.soc[s] <= max_soc[s] + self.delta for s in range(self.n_storages)),
+            (
+                self.soc[s] <= max_soc[s] + self.delta
+                for s in range(self.n_storages)
+            ),
             "max-soc",
         )
 
@@ -292,7 +322,10 @@ class ModelBuilder(ABC):
 
     def add_final_soc_constraints(self, final_soc: list):
         self.model.addConstrs(
-            (self.soc[s] >= final_soc[s] - self.delta for s in range(self.n_storages)),
+            (
+                self.soc[s] >= final_soc[s] - self.delta
+                for s in range(self.n_storages)
+            ),
             "final soc",
         )
 
@@ -381,7 +414,9 @@ class ModelBuilder(ABC):
             "rate-down",
         )
 
-    def add_up_down_time_constraints(self, min_up_times: list, min_down_times: list):
+    def add_up_down_time_constraints(
+        self, min_up_times: list, min_down_times: list
+    ):
         self.model.addConstrs(
             (
                 gp.quicksum(self.z_x_bs[g])
@@ -423,10 +458,13 @@ class ModelBuilder(ABC):
         )
 
     def add_benders_cuts(
-        self, cut_intercepts: list, cut_gradients: list, trial_points: list,
+        self,
+        cut_intercepts: list,
+        cut_gradients: list,
+        trial_points: list,
     ):
         for intercept, gradient, trial_point in zip(
-            cut_intercepts, cut_gradients, trial_points
+            cut_intercepts, cut_gradients, trial_points, strict=False
         ):
             self.add_benders_cut(intercept, gradient, trial_point)
 
@@ -434,7 +472,10 @@ class ModelBuilder(ABC):
         self, cut_intercept: float, cut_gradient: list, trial_point: list
     ):
         state_variables = (
-            self.x + self.y + [var for gen_bs in self.x_bs for var in gen_bs] + self.soc
+            self.x
+            + self.y
+            + [var for gen_bs in self.x_bs for var in gen_bs]
+            + self.soc
         )
         n_state_variables = len(state_variables)
 
@@ -452,7 +493,7 @@ class ModelBuilder(ABC):
                     for i in range(n_state_variables)
                 )
             ),
-            f"benders-cut",
+            "benders-cut",
         )
 
     def add_cut_constraints(
@@ -466,10 +507,20 @@ class ModelBuilder(ABC):
     ):
         r = 0
         for intercept, gradient, y_multipliers, soc_multipliers in zip(
-            cut_intercepts, cut_gradients, y_binary_multipliers, soc_binary_multipliers
+            cut_intercepts,
+            cut_gradients,
+            y_binary_multipliers,
+            soc_binary_multipliers,
+            strict=False,
         ):
             self.add_cut(
-                intercept, gradient, y_multipliers, soc_multipliers, r, big_m, sos
+                intercept,
+                gradient,
+                y_multipliers,
+                soc_multipliers,
+                r,
+                big_m,
+                sos,
             )
             r += 1
         self.update_model()
@@ -484,10 +535,11 @@ class ModelBuilder(ABC):
         big_m: float,
         sos: bool = False,
     ):
-
         x_binary_multipliers = linalg.block_diag(*[1] * len(self.x))
         n_total_backsight_variables = sum(self.backsight_periods)
-        x_bs_binary_multipliers = linalg.block_diag(*[1] * n_total_backsight_variables)
+        x_bs_binary_multipliers = linalg.block_diag(
+            *[1] * n_total_backsight_variables
+        )
 
         binary_multipliers = linalg.block_diag(
             x_binary_multipliers, y_binary_multipliers
@@ -517,7 +569,11 @@ class ModelBuilder(ABC):
             name=f"eta_{id}",
         )
         lmda = self.model.addVars(
-            n_binaries, vtype=gp.GRB.CONTINUOUS, lb=0, ub=1, name=f"lambda_{id}"
+            n_binaries,
+            vtype=gp.GRB.CONTINUOUS,
+            lb=0,
+            ub=1,
+            name=f"lambda_{id}",
         )
 
         state_vars = (
@@ -538,7 +594,9 @@ class ModelBuilder(ABC):
             (
                 self.theta
                 >= cut_intercept
-                + gp.quicksum(lmda[i] * cut_gradient[i] for i in range(n_binaries))
+                + gp.quicksum(
+                    lmda[i] * cut_gradient[i] for i in range(n_binaries)
+                )
             ),
             f"cut_{id}",
         )
@@ -546,14 +604,14 @@ class ModelBuilder(ABC):
         # KKT conditions
         self.model.addConstrs(
             (
-                0
-                == -cut_gradient[j]
+                -cut_gradient[j]
                 - ny[j]
                 + my[j]
                 + gp.quicksum(
                     binary_multipliers[i, j] * eta[i]
                     for i in range(n_var_approximations)
                 )
+                == 0
                 for j in range(n_binaries)
             ),
             f"KKT(1)_{id}",
@@ -561,11 +619,12 @@ class ModelBuilder(ABC):
 
         self.model.addConstrs(
             (
-                0
-                == gp.quicksum(
-                    binary_multipliers[i, j] * lmda[j] for j in range(n_binaries)
+                gp.quicksum(
+                    binary_multipliers[i, j] * lmda[j]
+                    for j in range(n_binaries)
                 )
                 - state_vars[i]
+                == 0
                 for i in range(n_var_approximations)
             ),
             f"KKT(2)_{id}",
@@ -583,10 +642,12 @@ class ModelBuilder(ABC):
             # )
         else:
             self.model.addConstrs(
-                (ny[i] <= m2[i] * (1 - w[i]) for i in range(n_binaries)), f"KKT(4)_{id}"
+                (ny[i] <= m2[i] * (1 - w[i]) for i in range(n_binaries)),
+                f"KKT(4)_{id}",
             )
             self.model.addConstrs(
-                (my[i] <= m4[i] * (1 - u[i]) for i in range(n_binaries)), f"KKT(6)_{id}"
+                (my[i] <= m4[i] * (1 - u[i]) for i in range(n_binaries)),
+                f"KKT(6)_{id}",
             )
 
         self.model.addConstrs(
@@ -644,11 +705,17 @@ class ForwardModelBuilder(ModelBuilder):
         soc_trial_point: list,
     ):
         self.copy_constraints_x = self.model.addConstrs(
-            (self.z_x[g] == x_trial_point[g] for g in range(self.n_generators)),
+            (
+                self.z_x[g] == x_trial_point[g]
+                for g in range(self.n_generators)
+            ),
             "copy-x",
         )
         self.copy_constraints_y = self.model.addConstrs(
-            (self.z_y[g] == y_trial_point[g] for g in range(self.n_generators)),
+            (
+                self.z_y[g] == y_trial_point[g]
+                for g in range(self.n_generators)
+            ),
             "copy-y",
         )
         self.copy_constraints_x_bs = self.model.addConstrs(
@@ -660,7 +727,10 @@ class ForwardModelBuilder(ModelBuilder):
             "copy-x-bs",
         )
         self.copy_constraints_soc = self.model.addConstrs(
-            (self.z_soc[s] == soc_trial_point[s] for s in range(self.n_storages)),
+            (
+                self.z_soc[s] == soc_trial_point[s]
+                for s in range(self.n_storages)
+            ),
             "copy-soc",
         )
         self.update_model()
@@ -672,8 +742,12 @@ class ForwardModelBuilder(ModelBuilder):
         x_bs_trial_point: list[list],
         soc_trial_point: list,
     ):
-        copy_terms = [x_trial_point[g] - self.z_x[g] for g in range(self.n_generators)]
-        copy_terms += [y_trial_point[g] - self.z_y[g] for g in range(self.n_generators)]
+        copy_terms = [
+            x_trial_point[g] - self.z_x[g] for g in range(self.n_generators)
+        ]
+        copy_terms += [
+            y_trial_point[g] - self.z_y[g] for g in range(self.n_generators)
+        ]
         copy_terms += [
             x_bs_trial_point[g][k] - self.z_x_bs[g][k]
             for g in range(self.n_generators)
@@ -874,7 +948,8 @@ class BackwardModelBuilder(ModelBuilder):
             (
                 self.z_soc[i]
                 == gp.quicksum(
-                    soc_binary_trial_multipliers[i, j] * self.soc_bin_copy_vars[j]
+                    soc_binary_trial_multipliers[i, j]
+                    * self.soc_bin_copy_vars[j]
                     for j in range(n_soc_binaries)
                 )
                 for i in range(n_soc_var_approximations)
@@ -885,6 +960,10 @@ class BackwardModelBuilder(ModelBuilder):
 
     def check_bin_copy_vars_not_empty(self):
         if not (
-            self.x_bin_copy_vars and self.y_bin_copy_vars and self.x_bs_bin_copy_vars
+            self.x_bin_copy_vars
+            and self.y_bin_copy_vars
+            and self.x_bs_bin_copy_vars
         ):
-            raise ValueError("Copy variable does not exist. Call add_relaxation first.")
+            raise ValueError(
+                "Copy variable does not exist. Call add_relaxation first."
+            )

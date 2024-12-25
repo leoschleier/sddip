@@ -1,14 +1,14 @@
 import logging
+from time import time
+
 import gurobipy as gp
 
-from time import time
 from ..sddip import parameters, sddip_logging, tree
 
 logger = logging.getLogger(__name__)
 
 
 def main():
-
     test_case_name = "case6ww"
     n_stages = 6
     n_realizations = 3

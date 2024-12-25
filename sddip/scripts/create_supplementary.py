@@ -1,6 +1,8 @@
-import os
 import math
+import os
+
 import pandas as pd
+
 from .. import config
 
 
@@ -25,8 +27,8 @@ def create_supplementary_data(test_case: str, t: int, n: int):
         test_case_scenario_dir, "gen_sup_data.txt"
     )
 
-    gen_df = pd.read_csv(gen_file, delimiter="\s+")
-    scenario_df = pd.read_csv(scenario_file, delimiter="\s+")
+    gen_df = pd.read_csv(gen_file, delimiter=r"\s+")
+    scenario_df = pd.read_csv(scenario_file, delimiter=r"\s+")
 
     rated_capacities = gen_df["Pmax"].values.tolist()
     buses = gen_df["bus"].values.tolist()

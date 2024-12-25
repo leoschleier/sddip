@@ -1,5 +1,7 @@
 class Node:
-    def __init__(self, stage: int, index: int, realization: int, parent: "Node" = None):
+    def __init__(
+        self, stage: int, index: int, realization: int, parent: "Node" = None
+    ):
         self.stage = stage
         self.index = index
         self.realization = realization
@@ -46,9 +48,7 @@ class ScenarioTree:
 
     def __str__(self):
         total_number_of_nodes = sum(self.n_nodes_per_stage)
-        return (
-            f"ScenarioTree: Stages = {self.n_stages}, Nodes = {total_number_of_nodes}"
-        )
+        return f"ScenarioTree: Stages = {self.n_stages}, Nodes = {total_number_of_nodes}"
 
     def get_node(self, stage, index):
         return self.nodes[stage][index]

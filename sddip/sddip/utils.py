@@ -73,14 +73,18 @@ class Binarizer:
     def calc_binary_multipliers_from_n_binaries(
         self, upper_bound: float, n_binaries: int
     ):
-        precision = self.calc_precision_from_n_binaries(upper_bound, n_binaries)
+        precision = self.calc_precision_from_n_binaries(
+            upper_bound, n_binaries
+        )
 
         return self.calc_binary_multipliers(precision, n_binaries)
 
     def calc_binary_multipliers(self, precision: float, n_binaries: int):
-        return [precision * 2 ** i for i in range(n_binaries)]
+        return [precision * 2**i for i in range(n_binaries)]
 
-    def calc_precision_from_n_binaries(self, upper_bound: float, n_binaries: int):
+    def calc_precision_from_n_binaries(
+        self, upper_bound: float, n_binaries: int
+    ):
         return upper_bound / (sum([2 ** (k) for k in range(n_binaries)]))
 
     def calc_max_abs_error(self, precision: int):
@@ -88,7 +92,9 @@ class Binarizer:
             raise ValueError("Precision should be between 0 and 1.")
         return precision / 2
 
-    def calc_binary_lower_approximation(self, x: float, binary_multipliers: list):
+    def calc_binary_lower_approximation(
+        self, x: float, binary_multipliers: list
+    ):
         bin_vars = []
 
         for b in reversed(binary_multipliers):
@@ -112,7 +118,9 @@ class Binarizer:
 
         if first_zero_index != None:
             upper_approximation_vars = lower_approximation_vars.copy()
-            upper_approximation_vars[:first_zero_index] = [0] * first_zero_index
+            upper_approximation_vars[:first_zero_index] = [
+                0
+            ] * first_zero_index
             upper_approximation_vars[first_zero_index] = 1
 
         return upper_approximation_vars

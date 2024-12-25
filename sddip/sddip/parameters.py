@@ -153,7 +153,6 @@ class Parameters:
 
     def _init_deterministic_parameters(self):
         """Initializes all deterministic parameters"""
-
         gc_positive = np.where(self.gen_cost_df.c1 > 0, self.gen_cost_df.c1, 1)
         suc_positive = np.where(
             self.gen_cost_df.startup > 0, self.gen_cost_df.startup, 1
@@ -214,14 +213,21 @@ class Parameters:
         # TODO Add ramp rate limits
         self.r_up = self.gen_sup_df["R_up"].values.tolist()
         self.r_down = self.gen_sup_df["R_down"].values.tolist()
-        self.r_su = [max(r, p) for r, p in zip(self.r_up, self.pg_min)]
-        self.r_sd = [max(r, p) for r, p in zip(self.r_down, self.pg_min)]
+        self.r_su = [
+            max(r, p) for r, p in zip(self.r_up, self.pg_min, strict=False)
+        ]
+        self.r_sd = [
+            max(r, p) for r, p in zip(self.r_down, self.pg_min, strict=False)
+        ]
 
         # TODO add min up and down times to probelm data
         self.min_up_time = self.gen_sup_df["UT"].values.tolist()
         self.min_down_time = self.gen_sup_df["DT"].values.tolist()
         self.backsight_periods = [
-            max(ut, dt) for ut, dt in zip(self.min_up_time, self.min_down_time)
+            max(ut, dt)
+            for ut, dt in zip(
+                self.min_up_time, self.min_down_time, strict=False
+            )
         ]
 
         # Lists of generators at each bus
@@ -291,7 +297,7 @@ class DataImporter:
         self.data_directory = data_directory if data_directory else ""
 
     def dataframe_from_csv(
-        self, file_path: str, delimiter: str = "\s+"
+        self, file_path: str, delimiter: str = r"\s+"
     ) -> pd.DataFrame:
         path = os.path.join(self.data_directory, file_path)
         df = pd.read_csv(path, sep=delimiter)

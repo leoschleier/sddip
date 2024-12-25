@@ -1,7 +1,9 @@
 import os
+
 import pandas as pd
-from ..sddip import scenarios
+
 from .. import config
+from ..sddip import scenarios
 
 
 def create_scenario_data(test_case: str, t: int, n: int):
@@ -18,8 +20,8 @@ def create_scenario_data(test_case: str, t: int, n: int):
     renewables_file_path = test_case_raw_dir / "ren_data.txt"
     scenario_file_path = test_case_scenario_dir / "scenario_data.txt"
 
-    bus_df = pd.read_csv(bus_file_path, delimiter="\s+")
-    renewables_df = pd.read_csv(renewables_file_path, delimiter="\s+")
+    bus_df = pd.read_csv(bus_file_path, delimiter=r"\s+")
+    renewables_df = pd.read_csv(renewables_file_path, delimiter=r"\s+")
 
     demands = bus_df["Pd"].values.tolist()
 

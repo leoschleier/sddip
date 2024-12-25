@@ -1,13 +1,12 @@
-from typing import Tuple
+import random as rdm
+
 import numpy as np
 import pandas as pd
-import random as rdm
 
 from .. import config
 
 
 class ScenarioGenerator:
-
     h0_load_profile = pd.read_csv(config.H0_LOAD_PROFILE_FILE, delimiter="\t")
 
     def __init__(self, n_stages, n_realizations_per_stage):
@@ -33,7 +32,6 @@ class ScenarioGenerator:
         max_value_targets: list,
         max_relative_variation: float,
     ) -> pd.DataFrame:
-
         if not len(demand_buses) == len(max_value_targets):
             raise ValueError(
                 "Number of maximum target values must equal the number of demand buses."
@@ -69,7 +67,7 @@ class ScenarioGenerator:
         # Set loads for stages >1
         for t in range(1, self.n_stages):
             for n in range(1, self.n_realizations_per_stage + 1):
-                scenario_data[f"t"].append(t + 1)
+                scenario_data["t"].append(t + 1)
                 scenario_data["n"].append(n)
                 scenario_data["p"].append(1 / self.n_realizations_per_stage)
                 for b in range(len(demand_buses)):
@@ -131,7 +129,7 @@ class ScenarioGenerator:
         # Set loads for stages >1
         for t in range(1, self.n_stages):
             for n in range(1, self.n_realizations_per_stage + 1):
-                scenario_data[f"t"].append(t + 1)
+                scenario_data["t"].append(t + 1)
                 scenario_data["n"].append(n)
                 scenario_data["p"].append(1 / self.n_realizations_per_stage)
                 for b in range(len(renewables_buses)):
@@ -176,7 +174,7 @@ class ScenarioGenerator:
 
     def create_bus_keys(
         self, n_buses: int, active_buses: list, label: str
-    ) -> Tuple:
+    ) -> tuple:
         active_bus_keys = []
         inactive_bus_keys = []
 

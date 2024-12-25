@@ -3,7 +3,6 @@ import logging
 import os
 import time
 from abc import ABC, abstractmethod
-from typing import Optional, Tuple
 
 import gurobipy as gp
 import numpy as np
@@ -51,7 +50,7 @@ class DualSolver(ABC):
         self.results = SolverResults()
 
     @abstractmethod
-    def solve(self, *args, **kwargs) -> Tuple[gp.Model, SolverResults]:
+    def solve(self, *args, **kwargs) -> tuple[gp.Model, SolverResults]:
         """Solve the dual problem."""
 
     def get_subgradient_and_value(
@@ -60,8 +59,8 @@ class DualSolver(ABC):
         objective_terms,
         relaxed_terms,
         dual_multipliers,
-        time_limit: Optional[float] = None,
-    ) -> Tuple[np.ndarray, float]:
+        time_limit: float | None = None,
+    ) -> tuple[np.ndarray, float]:
         """Compute the subgradient and the objective value of the dual
         problem.
         """
@@ -80,7 +79,7 @@ class DualSolver(ABC):
         if time_limit is not None:
             model.setParam(
                 "TimeLimit",
-                max(time_limit * 60, 10)
+                max(time_limit * 60, 10),
                 # Ensure that Gurobi has enough time to find at least a
                 # feasible point. Otherwise, retrieving the variable
                 # values would fail.
@@ -107,7 +106,7 @@ class DualSolver(ABC):
         lowest_gradient_magnitude: float,
         best_lower_bound: float,
         method: str = "",
-        n_serious_steps: Optional[int] = None,
+        n_serious_steps: int | None = None,
     ):
         if n_serious_steps is not None:
             n_null_steps = iteration - n_serious_steps
@@ -163,7 +162,7 @@ class SubgradientMethod(DualSolver):
         relaxed_terms,
         optimal_value_estimate: float = None,
         log_id: str = None,
-    ) -> Tuple[gp.Model, SolverResults]:
+    ) -> tuple[gp.Model, SolverResults]:
         self.on_solver_call()
         model.setParam("OutputFlag", 0)
 
@@ -205,11 +204,7 @@ class SubgradientMethod(DualSolver):
 
             gradient_magnitude = np.linalg.norm(subgradient, 2)
 
-            lowest_gm = (
-                gradient_magnitude
-                if gradient_magnitude < lowest_gm
-                else lowest_gm
-            )
+            lowest_gm = min(lowest_gm, gradient_magnitude)
 
             # Update best lower bound and mutlipliers
             if best_lower_bound < opt_value:
@@ -242,7 +237,7 @@ class SubgradientMethod(DualSolver):
                 method, subgradient, opt_value, optimal_value_estimate
             )
 
-            if not j == self.max_iterations - 1:
+            if j != self.max_iterations - 1:
                 dual_multipliers = dual_multipliers + step_size * subgradient
 
             self.log_iteration_info(j, opt_value, subgradient, step_size)
@@ -349,7 +344,7 @@ class BundleMethod(DualSolver):
         tolerance: float,
         log_dir: str,
         predicted_ascent="abs",
-        time_limit: Optional[float] = None,
+        time_limit: float | None = None,
     ):
         """Initialize Bundle Method
 
@@ -370,7 +365,7 @@ class BundleMethod(DualSolver):
             Time limit in seconds after which the bundle method is being
             interrupted, by default None
 
-        Raises
+        Raises:
         ------
         ValueError
             If predicted_ascent is not 'abs' or 'rel'
@@ -412,7 +407,7 @@ class BundleMethod(DualSolver):
 
     def solve(
         self, model: gp.Model, objective_terms, relaxed_terms
-    ) -> Tuple[gp.Model, SolverResults]:
+    ) -> tuple[gp.Model, SolverResults]:
         """Solve the dual problem using the bundle method."""
         logger.debug("Bundle method started")
         start_time = time.time()
@@ -464,7 +459,7 @@ class BundleMethod(DualSolver):
 
             subproblem.setParam(
                 "TimeLimit",
-                max(time_remaining, 10)
+                max(time_remaining, 10),
                 # Ensure that Gurobi has enough time to find at least a
                 # feasible point. Otherwise, retrieving the variable
                 # values would fail.
@@ -489,7 +484,7 @@ class BundleMethod(DualSolver):
             if delta <= self.tolerance:
                 tolerance_reached = True
                 break
-            elif time.time() - start_time >= self._time_limit:
+            if time.time() - start_time >= self._time_limit:
                 time_limit_reached = True
                 break
 
@@ -615,9 +610,8 @@ class BundleMethod(DualSolver):
 
     def create_subproblem(
         self, n_dual_multipliers: int
-    ) -> Tuple[gp.Model, gp.Var, gp.tupledict]:
+    ) -> tuple[gp.Model, gp.Var, gp.tupledict]:
         """Create the bundle method's subproblem."""
-
         subproblem = gp.Model("Subproblem")
         subproblem.setParam("OutputFlag", 0)
         v = subproblem.addVar(

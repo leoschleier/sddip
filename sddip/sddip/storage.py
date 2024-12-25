@@ -1,7 +1,8 @@
 import os
+from datetime import datetime
+
 import pandas as pd
 
-from datetime import datetime
 from .. import config
 
 

@@ -1,11 +1,10 @@
-import logging
-import os
-from typing import Callable, List, Union
 import argparse
 import datetime as dt
+import logging
+import os
+from collections.abc import Callable
 
 from . import config
-
 from .operators import classical_runner, dynamic_runner, extensive_runner
 from .scripts import (
     clear_result_directories,
@@ -14,12 +13,10 @@ from .scripts import (
     gather_latest_results,
 )
 
-
 logger = logging.getLogger(__name__)
 
 
-
-def main(argv: List[str]):
+def main(argv: list[str]):
     """Run the command line interface."""
     args = _parse_arguments(argv)
 
@@ -43,7 +40,7 @@ def main(argv: List[str]):
     logger.info("Job completed")
 
 
-def _parse_arguments(argv: List[str]) -> argparse.Namespace:
+def _parse_arguments(argv: list[str]) -> argparse.Namespace:
     """Parse the command line arguments."""
     parser = _create_argument_parser()
     args = parser.parse_args(argv)
@@ -52,7 +49,6 @@ def _parse_arguments(argv: List[str]) -> argparse.Namespace:
 
 def _create_argument_parser() -> argparse.ArgumentParser:
     """Create an argument parser for the command line interface."""
-
     parser = argparse.ArgumentParser(description="Dynamic SDDIP")
 
     parser.add_argument(
@@ -113,16 +109,15 @@ def _init_logging(verbose: bool = False, no_files: bool = False):
     )
 
 
-def _get_run_func(args: argparse.Namespace) -> Union[Callable, None]:
+def _get_run_func(args: argparse.Namespace) -> Callable | None:
     """Return the function to run based on the command line arguments."""
     if args.classical:
         return classical_runner.main
-    elif args.dynamic:
+    if args.dynamic:
         return dynamic_runner.main
-    elif args.extensive:
+    if args.extensive:
         return extensive_runner.main
-    else:
-        return None
+    return None
 
 
 def _execute_aux_func(args: argparse.Namespace) -> bool:

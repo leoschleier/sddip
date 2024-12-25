@@ -1,8 +1,9 @@
-import os
 import json
-import gurobipy as gp
-from time import time
+import os
 from datetime import datetime
+from time import time
+
+import gurobipy as gp
 
 from .. import config
 

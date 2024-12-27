@@ -481,9 +481,7 @@ class ModelBuilder(ABC):
 
         if n_state_variables != len(trial_point):
             msg = "Number of state variables must be equal to the number of trial points."
-            raise ValueError(
-                msg
-            )
+            raise ValueError(msg)
 
         self.model.addConstr(
             (
@@ -966,6 +964,4 @@ class BackwardModelBuilder(ModelBuilder):
             and self.x_bs_bin_copy_vars
         ):
             msg = "Copy variable does not exist. Call add_relaxation first."
-            raise ValueError(
-                msg
-            )
+            raise ValueError(msg)

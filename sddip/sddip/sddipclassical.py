@@ -776,7 +776,6 @@ class Algorithm:
         # Value of stage t objective function
         return uc_fw.model.getObjective().getValue()
 
-
     def add_problem_constraints(
         self,
         model_builder: ucmodelclassical.ClassicalModel,

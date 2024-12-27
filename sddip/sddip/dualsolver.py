@@ -19,7 +19,9 @@ class SolverResults:
         self.solver_time = None
         self.n_iterations = None
 
-    def set_values(self, obj_value, multipliers, n_iterations, solver_time) -> None:
+    def set_values(
+        self, obj_value, multipliers, n_iterations, solver_time
+    ) -> None:
         self.obj_value = obj_value
         self.multipliers = multipliers
         self.n_iterations = n_iterations
@@ -395,9 +397,7 @@ class BundleMethod(DualSolver):
                 f"'{self.ABS_PREDICTED_ASCENT}' or "
                 f"'{self.REL_PREDICTED_ASCENT}'."
             )
-            raise ValueError(
-                msg
-            )
+            raise ValueError(msg)
 
     def _absolute_predicted_ascent(
         self, current_value: float, new_value: float

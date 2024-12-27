@@ -17,7 +17,9 @@ def main() -> None:
                 elif os.path.isdir(file_path):
                     shutil.rmtree(file_path)
             except Exception as ex:
-                logger.exception("Failed to delete %s. Reason: %s", file_path, ex)
+                logger.exception(
+                    "Failed to delete %s. Reason: %s", file_path, ex
+                )
 
 
 if __name__ == "__main__":

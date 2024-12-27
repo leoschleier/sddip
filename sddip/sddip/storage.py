@@ -20,7 +20,9 @@ class ResultsManager:
 
 
 class ResultStorage:
-    def __init__(self, result_keys: list | None = None, label="results") -> None:
+    def __init__(
+        self, result_keys: list | None = None, label="results"
+    ) -> None:
         if result_keys is None:
             result_keys = []
         self.result_keys = result_keys

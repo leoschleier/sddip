@@ -63,7 +63,9 @@ def create_scenario_data(test_case: str, t: int, n: int) -> None:
             0.2,
         )
     )
-    renewables_scenario_df = renewables_scenario_df.drop(["t", "n", "p"], axis=1)
+    renewables_scenario_df = renewables_scenario_df.drop(
+        ["t", "n", "p"], axis=1
+    )
 
     scenario_df = pd.concat(
         [demand_scenario_df, renewables_scenario_df], axis=1

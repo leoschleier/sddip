@@ -1,8 +1,10 @@
+import contextlib
+
 import numpy as np
 
 
 class Graph:
-    def __init__(self, nodes: list, edges: list):
+    def __init__(self, nodes: list, edges: list) -> None:
         self.edges = edges
         self.nodes = nodes
 
@@ -47,7 +49,7 @@ class Binarizer:
         best_appr_vars = lower_approximation_vars
 
         # Choose approximation with the lowest error
-        if upper_approximation_vars != None:
+        if upper_approximation_vars is not None:
             binary_multipliers = np.array(binary_multipliers)
             lower_approximation_vars = np.array(lower_approximation_vars)
             upper_approximation_vars = np.array(upper_approximation_vars)
@@ -89,7 +91,8 @@ class Binarizer:
 
     def calc_max_abs_error(self, precision: int):
         if 0 > precision > 1:
-            raise ValueError("Precision should be between 0 and 1.")
+            msg = "Precision should be between 0 and 1."
+            raise ValueError(msg)
         return precision / 2
 
     def calc_binary_lower_approximation(
@@ -109,14 +112,12 @@ class Binarizer:
     def calc_binary_upper_approximation(self, lower_approximation_vars):
         first_zero_index = None
 
-        try:
+        with contextlib.suppress(ValueError):
             first_zero_index = lower_approximation_vars.index(0)
-        except ValueError:
-            pass
 
         upper_approximation_vars = None
 
-        if first_zero_index != None:
+        if first_zero_index is not None:
             upper_approximation_vars = lower_approximation_vars.copy()
             upper_approximation_vars[:first_zero_index] = [
                 0

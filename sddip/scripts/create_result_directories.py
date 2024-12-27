@@ -1,9 +1,9 @@
 from pathlib import Path
 
-from .. import config
+from sddip import config
 
 
-def main():
+def main() -> None:
     for dir in [config.RESULTS_DIR, config.LOGS_DIR]:
         Path(dir).mkdir(parents=True, exist_ok=True)
 

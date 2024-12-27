@@ -3,10 +3,10 @@ import os
 
 import pandas as pd
 
-from .. import config
+from sddip import config
 
 
-def create_supplementary_data(test_case: str, t: int, n: int):
+def create_supplementary_data(test_case: str, t: int, n: int) -> None:
     scenario_str = f"t{str(t).zfill(2)}_n{str(n).zfill(2)}"
 
     # Ramp rate
@@ -40,7 +40,7 @@ def create_supplementary_data(test_case: str, t: int, n: int):
     # Generate min up-/down-time
     n_gens = len(rated_capacities)
     n_stages = scenario_df["t"].max()
-    n_restrictive_periods = int(math.ceil(1 / up_down_factor * n_stages))
+    int(math.ceil(1 / up_down_factor * n_stages))
 
     min_up_time = [2] * n_gens
     min_down_time = min_up_time

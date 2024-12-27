@@ -2,10 +2,10 @@ import shutil
 from collections.abc import Iterable
 from pathlib import Path
 
-from .. import config
+from sddip import config
 
 
-def main():
+def main() -> None:
     n = 1
 
     log_files = config.LOGS_DIR.glob("*.txt")
@@ -29,9 +29,6 @@ def main():
         strict=False,
     ):
         test_case, stages, realizations = get_test_case_info(log)
-        print(
-            f"Copying results for: {test_case}, t={stages}, n={realizations}"
-        )
         target_dir = temp_dir / test_case / f"t{stages}_n{realizations}"
         target_dir.mkdir(parents=True, exist_ok=True)
         shutil.copyfile(log, target_dir / "logs.txt")
@@ -59,7 +56,8 @@ def get_test_case_info(log_file: Path):
 
                 return test_case, stages, realizations
 
-    raise ValueError("No test case info found.")
+    msg = "No test case info found."
+    raise ValueError(msg)
 
 
 if __name__ == "__main__":

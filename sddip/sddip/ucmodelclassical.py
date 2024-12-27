@@ -31,7 +31,7 @@ class ClassicalModel(BackwardModelBuilder):
         )
         self.lp_relax = lp_relax
 
-    def binary_approximation(self, y_bin_multipliers, soc_bin_multipliers):
+    def binary_approximation(self, y_bin_multipliers, soc_bin_multipliers) -> None:
         self.y_bin_states = []
         self.soc_bin_states = []
         n_y_bin_vars = [len(bin_mult) for bin_mult in y_bin_multipliers]
@@ -98,7 +98,7 @@ class ClassicalModel(BackwardModelBuilder):
         y_binary_trial_point: list,
         x_bs_binary_trial_point: list[list],
         soc_binary_trial_point: list,
-    ):
+    ) -> None:
         self.add_relaxation(
             x_binary_trial_point,
             y_binary_trial_point,
@@ -117,7 +117,7 @@ class ClassicalModel(BackwardModelBuilder):
         y_binary_trial_point: list,
         x_bs_binary_trial_point: list[list],
         soc_binary_trial_point: list,
-    ):
+    ) -> None:
         self.add_relaxation(
             x_binary_trial_point,
             y_binary_trial_point,
@@ -129,7 +129,7 @@ class ClassicalModel(BackwardModelBuilder):
         self,
         cut_intercepts: list,
         cut_gradients: list,
-    ):
+    ) -> None:
         state_variables = (
             self.x
             + self.y_bin_states_flattened
@@ -153,7 +153,7 @@ class ClassicalModel(BackwardModelBuilder):
 
     def add_benders_cuts(
         self, cut_intercepts: list, cut_gradients: list, trial_points: list
-    ):
+    ) -> None:
         state_variables = (
             self.x
             + self.y_bin_states_flattened
@@ -168,8 +168,9 @@ class ClassicalModel(BackwardModelBuilder):
         ):
             if n_state_variables != len(trial_point):
                 logger.warning("Trial point: %s", trial_point)
+                msg = "Number of state variables must be equal to the number of trial points."
                 raise ValueError(
-                    "Number of state variables must be equal to the number of trial points."
+                    msg
                 )
 
             self.model.addConstr(

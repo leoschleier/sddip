@@ -2,11 +2,11 @@ import os
 
 import pandas as pd
 
-from .. import config
-from ..sddip import scenarios
+from sddip import config
+from sddip.sddip import scenarios
 
 
-def create_scenario_data(test_case: str, t: int, n: int):
+def create_scenario_data(test_case: str, t: int, n: int) -> None:
     scenario_str = f"t{str(t).zfill(2)}_n{str(n).zfill(2)}"
 
     # Parameter retrieval
@@ -35,7 +35,7 @@ def create_scenario_data(test_case: str, t: int, n: int):
 
     renewables_buses = [b for b in range(n_buses) if re_max_frac[b] != 0]
 
-    re_base_values = [frac * sum(demands) for frac in re_max_frac if frac != 0]
+    [frac * sum(demands) for frac in re_max_frac if frac != 0]
 
     # Generate scenarios
     sc_generator = scenarios.ScenarioGenerator(t, n)
@@ -63,7 +63,7 @@ def create_scenario_data(test_case: str, t: int, n: int):
             0.2,
         )
     )
-    renewables_scenario_df.drop(["t", "n", "p"], axis=1, inplace=True)
+    renewables_scenario_df = renewables_scenario_df.drop(["t", "n", "p"], axis=1)
 
     scenario_df = pd.concat(
         [demand_scenario_df, renewables_scenario_df], axis=1

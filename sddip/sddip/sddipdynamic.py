@@ -34,7 +34,7 @@ class Algorithm:
         n_realizations: int,
         log_dir: str,
         dual_solver: dualsolver.DualSolver,
-    ):
+    ) -> None:
         # Logger
         self.runtime_logger = sddip_logging.RuntimeLogger(log_dir)
 
@@ -95,7 +95,7 @@ class Algorithm:
             ResultKeys.bound_keys, "bounds"
         )
 
-    def run(self, n_iterations: int):
+    def run(self, n_iterations: int) -> None:
         logger.info("#### SDDiP-Algorithm started ####")
         self.runtime_logger.start()
         self.dual_solver.runtime_logger.start()
@@ -331,7 +331,7 @@ class Algorithm:
         iteration: int,
         lower_bounds: list,
         lagrangian_cut_iterations: list,
-    ):
+    ) -> None:
         # Check if refinment condition is true
         refinement_condition = False
 
@@ -373,7 +373,7 @@ class Algorithm:
             "Approximation errors: %s", continuous_variables_approx_error
         )
 
-    def select_cut_mode(self, iteration: int, lower_bounds: list):
+    def select_cut_mode(self, iteration: int, lower_bounds: list) -> None:
         no_improvement_condition = False
 
         if iteration > 1:
@@ -387,7 +387,7 @@ class Algorithm:
             self.current_cut_mode = self.secondary_cut_mode
             self.n_samples = self.n_samples_secondary
 
-    def backward_pass(self, iteration: int, samples: list):
+    def backward_pass(self, iteration: int, samples: list) -> None:
         i = iteration
         n_samples = len(samples)
 
@@ -538,7 +538,7 @@ class Algorithm:
 
                 self.cc_storage.add_result(i, k, t - 1, cc_dict)
 
-    def backward_benders(self, iteration: int, samples: list):
+    def backward_benders(self, iteration: int, samples: list) -> None:
         i = iteration
         n_samples = len(samples)
         for t in reversed(range(1, self.problem_params.n_stages)):
@@ -663,9 +663,7 @@ class Algorithm:
 
                 bc_dict[ResultKeys.bc_intercept_key] = v
                 bc_dict[ResultKeys.bc_gradient_key] = pi.tolist()
-                bc_dict[ResultKeys.bc_trial_point_key] = [
-                    t for t in trial_point
-                ]
+                bc_dict[ResultKeys.bc_trial_point_key] = list(trial_point)
 
                 self.bc_storage.add_result(i, k, t - 1, bc_dict)
 
@@ -703,12 +701,11 @@ class Algorithm:
         uc_fw.model.optimize()
 
         # Value of stage t objective function
-        v_lower = uc_fw.model.getObjective().getValue()
+        return uc_fw.model.getObjective().getValue()
         # logger.info(f"Delta: {uc_fw.delta.x}")
         # logger.info(f"Theta: {uc_fw.theta.x}")
         # if i == 10:
         #     uc_fw.model.write("model.lp")
-        return v_lower
 
     def add_problem_constraints(
         self,

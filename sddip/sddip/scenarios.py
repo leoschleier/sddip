@@ -3,18 +3,20 @@ import random as rdm
 import numpy as np
 import pandas as pd
 
-from .. import config
+from sddip import config
 
 
 class ScenarioGenerator:
     h0_load_profile = pd.read_csv(config.H0_LOAD_PROFILE_FILE, delimiter="\t")
 
-    def __init__(self, n_stages, n_realizations_per_stage):
+    def __init__(self, n_stages, n_realizations_per_stage) -> None:
         if n_stages < 2:
-            raise ValueError("Number of stages must be greater than 1.")
+            msg = "Number of stages must be greater than 1."
+            raise ValueError(msg)
         if n_realizations_per_stage < 2:
+            msg = "Number of realizations per stage must be greater than 1."
             raise ValueError(
-                "Number of realizations per stage must be greater than 1."
+                msg
             )
         self.h0_profile = ScenarioGenerator.h0_load_profile.h0.values.tolist()
         self.n_stages = n_stages
@@ -32,9 +34,10 @@ class ScenarioGenerator:
         max_value_targets: list,
         max_relative_variation: float,
     ) -> pd.DataFrame:
-        if not len(demand_buses) == len(max_value_targets):
+        if len(demand_buses) != len(max_value_targets):
+            msg = "Number of maximum target values must equal the number of demand buses."
             raise ValueError(
-                "Number of maximum target values must equal the number of demand buses."
+                msg
             )
 
         reduced_profile = self.reduce_profile(
@@ -90,9 +93,10 @@ class ScenarioGenerator:
         threshold: float,
         max_relative_variation: float,
     ) -> pd.DataFrame:
-        if not len(renewables_buses) == len(start_values):
+        if len(renewables_buses) != len(start_values):
+            msg = "Number of list entries must equal the number of renewables buses."
             raise ValueError(
-                "Number of list entries must equal the number of renewables buses."
+                msg
             )
 
         scenario_data = {"t": [1], "n": [1], "p": [1]}
@@ -196,8 +200,9 @@ class ScenarioGenerator:
 
     def reduce_profile(self, values: list, reduction_factor: int) -> list:
         if len(values) % reduction_factor != 0:
+            msg = "Number of values to be reduced must be divisible by the reduction factor."
             raise ValueError(
-                "Number of values to be reduced must be divisible by the reduction factor."
+                msg
             )
 
         values = np.array(values)
@@ -215,7 +220,7 @@ class ScenarioGenerator:
 
 
 class ScenarioSampler:
-    def __init__(self, n_stages: int, n_realizations_per_stage: int):
+    def __init__(self, n_stages: int, n_realizations_per_stage: int) -> None:
         self.n_stages = n_stages
         self.n_realizations_per_stage = n_realizations_per_stage
 

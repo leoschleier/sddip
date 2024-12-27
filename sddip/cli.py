@@ -16,7 +16,7 @@ from .scripts import (
 logger = logging.getLogger(__name__)
 
 
-def main(argv: list[str]):
+def main(argv: list[str]) -> None:
     """Run the command line interface."""
     args = _parse_arguments(argv)
 
@@ -43,8 +43,7 @@ def main(argv: list[str]):
 def _parse_arguments(argv: list[str]) -> argparse.Namespace:
     """Parse the command line arguments."""
     parser = _create_argument_parser()
-    args = parser.parse_args(argv)
-    return args
+    return parser.parse_args(argv)
 
 
 def _create_argument_parser() -> argparse.ArgumentParser:
@@ -84,7 +83,7 @@ def _create_argument_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def _init_logging(verbose: bool = False, no_files: bool = False):
+def _init_logging(verbose: bool = False, no_files: bool = False) -> None:
     """Initialize the logging."""
     if not os.path.exists(config.LOGS_DIR):
         os.makedirs(config.LOGS_DIR)
@@ -92,10 +91,7 @@ def _init_logging(verbose: bool = False, no_files: bool = False):
     now_str = dt.datetime.now().strftime("%Y%m%d%H%M%S")
     log_file = config.LOGS_DIR / f"{now_str}_logs.txt"
 
-    if verbose:
-        log_level = logging.DEBUG
-    else:
-        log_level = logging.INFO
+    log_level = logging.DEBUG if verbose else logging.INFO
 
     handlers = [logging.StreamHandler()]
 

@@ -4,7 +4,8 @@ import os
 import numpy as np
 import pandas as pd
 
-from .. import config
+from sddip import config
+
 from . import utils
 
 logger = logging.getLogger(__name__)
@@ -25,7 +26,7 @@ class Parameters:
         renewables_file="ren_data.txt",
         storage_file="storage_data.txt",
         scenario_file="scenario_data.txt",
-    ):
+    ) -> None:
         raw_data_dir = os.path.join(
             config.TEST_CASES_DIR, test_case_name, raw_directory
         )
@@ -115,15 +116,15 @@ class Parameters:
 
         self.initialize()
 
-    def initialize(self):
-        """Triggers the initialization of all parameters based on the corresponding data frames"""
+    def initialize(self) -> None:
+        """Triggers the initialization of all parameters based on the corresponding data frames."""
         self._calc_ptdf()
         self._init_deterministic_parameters()
         self._init_stochastic_parameters()
         self._init_initial_trial_points()
 
-    def _calc_ptdf(self):
-        """Calculates the Power Transmission Distribution Factor and infers the number of buses and lines"""
+    def _calc_ptdf(self) -> None:
+        """Calculates the Power Transmission Distribution Factor and infers the number of buses and lines."""
         nodes = self.bus_df.bus_i.values.tolist()
         edges = self.branch_df[["fbus", "tbus"]].values.tolist()
 
@@ -151,8 +152,8 @@ class Parameters:
         self.ptdf[abs(self.ptdf) < 10**-10] = 0
         self.n_lines, self.n_buses = self.ptdf.shape
 
-    def _init_deterministic_parameters(self):
-        """Initializes all deterministic parameters"""
+    def _init_deterministic_parameters(self) -> None:
+        """Initializes all deterministic parameters."""
         gc_positive = np.where(self.gen_cost_df.c1 > 0, self.gen_cost_df.c1, 1)
         suc_positive = np.where(
             self.gen_cost_df.startup > 0, self.gen_cost_df.startup, 1
@@ -244,8 +245,8 @@ class Parameters:
             g += 1
         self.gens_at_bus = gens_at_bus
 
-    def _init_stochastic_parameters(self):
-        """Initializes all stochastic parameters"""
+    def _init_stochastic_parameters(self) -> None:
+        """Initializes all stochastic parameters."""
         scenario_df = self.scenario_df
 
         self.n_realizations_per_stage = (
@@ -282,8 +283,8 @@ class Parameters:
 
         self.cut_lb = [0] * self.n_stages
 
-    def _init_initial_trial_points(self):
-        """Initializes the first stage trial points"""
+    def _init_initial_trial_points(self) -> None:
+        """Initializes the first stage trial points."""
         self.init_x_trial_point = [0] * self.n_gens
         self.init_y_trial_point = [0] * self.n_gens
         self.init_x_bs_trial_point = [
@@ -293,12 +294,11 @@ class Parameters:
 
 
 class DataImporter:
-    def __init__(self, data_directory: str = None):
+    def __init__(self, data_directory: str | None = None) -> None:
         self.data_directory = data_directory if data_directory else ""
 
     def dataframe_from_csv(
         self, file_path: str, delimiter: str = r"\s+"
     ) -> pd.DataFrame:
         path = os.path.join(self.data_directory, file_path)
-        df = pd.read_csv(path, sep=delimiter)
-        return df
+        return pd.read_csv(path, sep=delimiter)

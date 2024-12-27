@@ -1,12 +1,12 @@
 import logging
 
-from ..sddip import dualsolver, sddip_logging, sddipdynamic, storage
-from ..sddip.sddipdynamic import CutModes
+from sddip.sddip import dualsolver, sddip_logging, sddipdynamic, storage
+from sddip.sddip.sddipdynamic import CutModes
 
 logger = logging.getLogger(__name__)
 
 
-def main():
+def main() -> None:
     # Parameters
     test_case = "WB5"
     n_stages = 6
@@ -82,7 +82,7 @@ def main():
 
             if CutModes.LAGRANGIAN in algo.cut_types_added:
                 algo.cc_storage.export_results(results_dir)
-            if algo.cut_types_added - set([CutModes.LAGRANGIAN]):
+            if algo.cut_types_added - {CutModes.LAGRANGIAN}:
                 algo.bc_storage.export_results(results_dir)
 
         except ValueError as ex:

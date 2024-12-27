@@ -1,12 +1,12 @@
 import logging
 
-from ..sddip import dualsolver, sddip_logging, sddipclassical, storage
-from ..sddip.sddipclassical import CutModes
+from sddip.sddip import dualsolver, sddip_logging, sddipclassical, storage
+from sddip.sddip.sddipclassical import CutModes
 
 logger = logging.getLogger(__name__)
 
 
-def main():
+def main() -> None:
     # Parameters
     test_case = "case6ww"
     n_stages = 8
@@ -78,10 +78,10 @@ def main():
             algo.dual_solver_storage.export_results(results_dir)
             if CutModes.LAGRANGIAN in algo.cut_types_added:
                 algo.cc_storage.export_results(results_dir)
-            if algo.cut_types_added - set([CutModes.LAGRANGIAN]):
+            if algo.cut_types_added - {CutModes.LAGRANGIAN}:
                 algo.bc_storage.export_results(results_dir)
         except ValueError as ex:
-            logger.error("Export incomplete: %s", ex)
+            logger.exception("Export incomplete: %s", ex)
 
 
 if __name__ == "__main__":

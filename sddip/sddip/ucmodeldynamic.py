@@ -80,7 +80,7 @@ class ModelBuilder(ABC):
         self.initialize_variables()
         self.initialize_copy_variables()
 
-    def initialize_variables(self):
+    def initialize_variables(self) -> None:
         for g in range(self.n_generators):
             self.x.append(
                 self.model.addVar(
@@ -179,7 +179,7 @@ class ModelBuilder(ABC):
         # self.model.addConstrs(self.socs_p[s] == 0 for s in range(self.n_storages))
         # self.model.addConstrs(self.socs_n[s] == 0 for s in range(self.n_storages))
 
-    def initialize_copy_variables(self):
+    def initialize_copy_variables(self) -> None:
         for g in range(self.n_generators):
             self.z_x.append(
                 self.model.addVar(
@@ -208,7 +208,7 @@ class ModelBuilder(ABC):
             )
         self.model.update()
 
-    def add_objective(self, coefficients: list):
+    def add_objective(self, coefficients: list) -> None:
         # x_bs_p = []
         # x_bs_n = []
         # for g in range(self.n_generators):
@@ -246,7 +246,7 @@ class ModelBuilder(ABC):
         total_demand: float,
         total_renewable_generation: float,
         discharge_eff: list,
-    ):
+    ) -> None:
         self.balance_constraints = self.model.addConstr(
             gp.quicksum(self.y)
             + gp.quicksum(
@@ -262,7 +262,7 @@ class ModelBuilder(ABC):
 
     def add_generator_constraints(
         self, min_generation: list, max_generation: list
-    ):
+    ) -> None:
         self.model.addConstrs(
             (
                 self.y[g] >= min_generation[g] * self.x[g] - self.delta
@@ -281,7 +281,7 @@ class ModelBuilder(ABC):
 
     def add_storage_constraints(
         self, max_charge_rate: list, max_discharge_rate: list, max_soc: list
-    ):
+    ) -> None:
         self.model.addConstrs(
             (
                 self.ys_c[s] <= max_charge_rate[s] * self.u_c_dc[s]
@@ -306,7 +306,7 @@ class ModelBuilder(ABC):
             "max-soc",
         )
 
-    def add_soc_transfer(self, charge_eff: list):
+    def add_soc_transfer(self, charge_eff: list) -> None:
         self.model.addConstrs(
             (
                 self.soc[s]
@@ -320,7 +320,7 @@ class ModelBuilder(ABC):
             "soc",
         )
 
-    def add_final_soc_constraints(self, final_soc: list):
+    def add_final_soc_constraints(self, final_soc: list) -> None:
         self.model.addConstrs(
             (
                 self.soc[s] >= final_soc[s] - self.delta
@@ -336,7 +336,7 @@ class ModelBuilder(ABC):
         demand: list,
         renewable_generation: list,
         discharge_eff: list,
-    ):
+    ) -> None:
         line_flows = [
             gp.quicksum(
                 ptdf[l, b]
@@ -369,7 +369,7 @@ class ModelBuilder(ABC):
         )
         self.update_model()
 
-    def add_startup_shutdown_constraints(self):
+    def add_startup_shutdown_constraints(self) -> None:
         self.model.addConstrs(
             (
                 self.x[g] - self.z_x[g] <= self.s_up[g] + self.delta
@@ -392,7 +392,7 @@ class ModelBuilder(ABC):
         max_rate_down: list,
         startup_rate: list,
         shutdown_rate: list,
-    ):
+    ) -> None:
         self.model.addConstrs(
             (
                 self.y[g] - self.z_y[g]
@@ -416,7 +416,7 @@ class ModelBuilder(ABC):
 
     def add_up_down_time_constraints(
         self, min_up_times: list, min_down_times: list
-    ):
+    ) -> None:
         self.model.addConstrs(
             (
                 gp.quicksum(self.z_x_bs[g])
@@ -452,7 +452,7 @@ class ModelBuilder(ABC):
     ):
         pass
 
-    def add_cut_lower_bound(self, lower_bound: float):
+    def add_cut_lower_bound(self, lower_bound: float) -> None:
         self.cut_lower_bound = self.model.addConstr(
             (self.theta >= lower_bound), "cut-lb"
         )
@@ -462,7 +462,7 @@ class ModelBuilder(ABC):
         cut_intercepts: list,
         cut_gradients: list,
         trial_points: list,
-    ):
+    ) -> None:
         for intercept, gradient, trial_point in zip(
             cut_intercepts, cut_gradients, trial_points, strict=False
         ):
@@ -470,7 +470,7 @@ class ModelBuilder(ABC):
 
     def add_benders_cut(
         self, cut_intercept: float, cut_gradient: list, trial_point: list
-    ):
+    ) -> None:
         state_variables = (
             self.x
             + self.y
@@ -479,9 +479,10 @@ class ModelBuilder(ABC):
         )
         n_state_variables = len(state_variables)
 
-        if not n_state_variables == len(trial_point):
+        if n_state_variables != len(trial_point):
+            msg = "Number of state variables must be equal to the number of trial points."
             raise ValueError(
-                "Number of state variables must be equal to the number of trial points."
+                msg
             )
 
         self.model.addConstr(
@@ -504,7 +505,7 @@ class ModelBuilder(ABC):
         soc_binary_multipliers: list,
         big_m: float,
         sos: bool = False,
-    ):
+    ) -> None:
         r = 0
         for intercept, gradient, y_multipliers, soc_multipliers in zip(
             cut_intercepts,
@@ -534,7 +535,7 @@ class ModelBuilder(ABC):
         id: int,
         big_m: float,
         sos: bool = False,
-    ):
+    ) -> None:
         x_binary_multipliers = linalg.block_diag(*[1] * len(self.x))
         n_total_backsight_variables = sum(self.backsight_periods)
         x_bs_binary_multipliers = linalg.block_diag(
@@ -658,19 +659,19 @@ class ModelBuilder(ABC):
             (lmda[i] - 1 >= -u[i] for i in range(n_binaries)), f"KKT(5)_{id}"
         )
 
-    def remove(self, gurobi_objects):
+    def remove(self, gurobi_objects) -> None:
         # Remove if gurobi_objects not None or not empty
         if gurobi_objects:
             self.model.remove(gurobi_objects)
             self.update_model
 
-    def update_model(self):
+    def update_model(self) -> None:
         self.model.update()
 
-    def disable_output(self):
+    def disable_output(self) -> None:
         self.model.setParam("OutputFlag", 0)
 
-    def enable_output(self):
+    def enable_output(self) -> None:
         self.model.setParam("OutputFlag", 1)
 
 
@@ -703,7 +704,7 @@ class ForwardModelBuilder(ModelBuilder):
         y_trial_point: list,
         x_bs_trial_point: list[list],
         soc_trial_point: list,
-    ):
+    ) -> None:
         self.copy_constraints_x = self.model.addConstrs(
             (
                 self.z_x[g] == x_trial_point[g]
@@ -808,7 +809,7 @@ class BackwardModelBuilder(ModelBuilder):
         y_binary_trial_point: list,
         x_bs_binary_trial_point: list[list],
         soc_binary_trial_point: list,
-    ):
+    ) -> None:
         self.bin_copy_vars = []
         self.n_x_trial_binaries = len(x_binary_trial_point)
         self.n_y_trial_binaries = len(y_binary_trial_point)
@@ -875,7 +876,7 @@ class BackwardModelBuilder(ModelBuilder):
         y_binary_trial_point: list,
         x_bs_binary_trial_point: list[list],
         soc_binary_trial_point: list,
-    ):
+    ) -> None:
         self.check_bin_copy_vars_not_empty()
 
         self.relaxed_terms = [
@@ -903,7 +904,7 @@ class BackwardModelBuilder(ModelBuilder):
         self,
         y_binary_trial_multipliers: np.array,
         soc_binary_trial_multipliers: np.array,
-    ):
+    ) -> None:
         self.check_bin_copy_vars_not_empty()
 
         n_y_var_approximations, n_y_binaries = y_binary_trial_multipliers.shape
@@ -958,12 +959,13 @@ class BackwardModelBuilder(ModelBuilder):
         )
         self.update_model()
 
-    def check_bin_copy_vars_not_empty(self):
+    def check_bin_copy_vars_not_empty(self) -> None:
         if not (
             self.x_bin_copy_vars
             and self.y_bin_copy_vars
             and self.x_bs_bin_copy_vars
         ):
+            msg = "Copy variable does not exist. Call add_relaxation first."
             raise ValueError(
-                "Copy variable does not exist. Call add_relaxation first."
+                msg
             )

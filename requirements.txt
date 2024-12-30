@@ -1,3 +1,0 @@
-gurobipy
-pandas
-scipy

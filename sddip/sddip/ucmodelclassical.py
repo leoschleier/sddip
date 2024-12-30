@@ -1,4 +1,5 @@
 import logging
+
 import gurobipy as gp
 
 from .ucmodeldynamic import BackwardModelBuilder
@@ -30,8 +31,9 @@ class ClassicalModel(BackwardModelBuilder):
         )
         self.lp_relax = lp_relax
 
-    def binary_approximation(self, y_bin_multipliers, soc_bin_multipliers):
-
+    def binary_approximation(
+        self, y_bin_multipliers, soc_bin_multipliers
+    ) -> None:
         self.y_bin_states = []
         self.soc_bin_states = []
         n_y_bin_vars = [len(bin_mult) for bin_mult in y_bin_multipliers]
@@ -98,8 +100,7 @@ class ClassicalModel(BackwardModelBuilder):
         y_binary_trial_point: list,
         x_bs_binary_trial_point: list[list],
         soc_binary_trial_point: list,
-    ):
-
+    ) -> None:
         self.add_relaxation(
             x_binary_trial_point,
             y_binary_trial_point,
@@ -118,7 +119,7 @@ class ClassicalModel(BackwardModelBuilder):
         y_binary_trial_point: list,
         x_bs_binary_trial_point: list[list],
         soc_binary_trial_point: list,
-    ):
+    ) -> None:
         self.add_relaxation(
             x_binary_trial_point,
             y_binary_trial_point,
@@ -130,8 +131,7 @@ class ClassicalModel(BackwardModelBuilder):
         self,
         cut_intercepts: list,
         cut_gradients: list,
-    ):
-
+    ) -> None:
         state_variables = (
             self.x
             + self.y_bin_states_flattened
@@ -140,7 +140,9 @@ class ClassicalModel(BackwardModelBuilder):
         )
 
         id = 0
-        for intercept, gradient in zip(cut_intercepts, cut_gradients):
+        for intercept, gradient in zip(
+            cut_intercepts, cut_gradients, strict=False
+        ):
             # Cut constraint
             self.model.addConstr(
                 (
@@ -153,8 +155,7 @@ class ClassicalModel(BackwardModelBuilder):
 
     def add_benders_cuts(
         self, cut_intercepts: list, cut_gradients: list, trial_points: list
-    ):
-
+    ) -> None:
         state_variables = (
             self.x
             + self.y_bin_states_flattened
@@ -165,13 +166,12 @@ class ClassicalModel(BackwardModelBuilder):
         n_state_variables = len(state_variables)
 
         for intercept, gradient, trial_point in zip(
-            cut_intercepts, cut_gradients, trial_points
+            cut_intercepts, cut_gradients, trial_points, strict=False
         ):
-            if not n_state_variables == len(trial_point):
+            if n_state_variables != len(trial_point):
                 logger.warning("Trial point: %s", trial_point)
-                raise ValueError(
-                    "Number of state variables must be equal to the number of trial points."
-                )
+                msg = "Number of state variables must be equal to the number of trial points."
+                raise ValueError(msg)
 
             self.model.addConstr(
                 (
@@ -182,5 +182,5 @@ class ClassicalModel(BackwardModelBuilder):
                         for i in range(n_state_variables)
                     )
                 ),
-                f"cut",
+                "cut",
             )

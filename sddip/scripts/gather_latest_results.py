@@ -1,10 +1,11 @@
-from pathlib import Path
-from typing import Iterable
-from .. import config
 import shutil
+from collections.abc import Iterable
+from pathlib import Path
+
+from sddip import config
 
 
-def main():
+def main() -> None:
     n = 1
 
     log_files = config.LOGS_DIR.glob("*.txt")
@@ -19,17 +20,15 @@ def main():
 
     working_dir = Path.cwd()
     temp_dir = working_dir / "temp"
-    
+
     for log, rt, bm, res in zip(
         latest_log_files,
         latest_runtime_log_dirs,
         latest_bm_log_dirs,
         latest_results_dirs,
+        strict=False,
     ):
         test_case, stages, realizations = get_test_case_info(log)
-        print(
-            f"Copying results for: {test_case}, t={stages}, n={realizations}"
-        )
         target_dir = temp_dir / test_case / f"t{stages}_n{realizations}"
         target_dir.mkdir(parents=True, exist_ok=True)
         shutil.copyfile(log, target_dir / "logs.txt")
@@ -42,12 +41,11 @@ def get_last(n: int, l: Iterable) -> list:
     last_n = list(l)[-n:]
     if type(last_n) == list:
         return last_n
-    else:
-        return [last_n]
+    return [last_n]
 
 
 def get_test_case_info(log_file: Path):
-    with open(log_file, "r", encoding="utf-8") as file:
+    with open(log_file, encoding="utf-8") as file:
         content = file.read()
         for line in content.split("\n"):
             if "Test case:" in line:
@@ -58,7 +56,8 @@ def get_test_case_info(log_file: Path):
 
                 return test_case, stages, realizations
 
-    raise ValueError("No test case info found.")
+    msg = "No test case info found."
+    raise ValueError(msg)
 
 
 if __name__ == "__main__":

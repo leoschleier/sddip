@@ -1,15 +1,17 @@
 class Node:
-    def __init__(self, stage: int, index: int, realization: int, parent: "Node" = None):
+    def __init__(
+        self, stage: int, index: int, realization: int, parent: "Node" = None
+    ) -> None:
         self.stage = stage
         self.index = index
         self.realization = realization
         self.parent = parent
         self.children = []
 
-    def set_children(self, children: list):
+    def set_children(self, children: list) -> None:
         self.children = children
 
-    def get_ancestors(self, horizon: int = None):
+    def get_ancestors(self, horizon: int | None = None):
         n_ancestors = horizon if horizon else self.stage
         ancestors = []
 
@@ -22,14 +24,14 @@ class Node:
 
 
 class ScenarioTree:
-    def __init__(self, n_realizations_per_stage: list[int]):
+    def __init__(self, n_realizations_per_stage: list[int]) -> None:
         self.n_stages = len(n_realizations_per_stage)
         self.n_nodes_per_stage = [1]
         self.root = Node(0, 0, 0)
         self.nodes = [[self.root]]
         self._build_tree(n_realizations_per_stage)
 
-    def _build_tree(self, n_realizations_per_stage: list[int]):
+    def _build_tree(self, n_realizations_per_stage: list[int]) -> None:
         for t in range(1, self.n_stages):
             node_index = 0
             stage_nodes = []
@@ -44,11 +46,9 @@ class ScenarioTree:
 
         self.n_nodes_per_stage = [len(s) for s in self.nodes]
 
-    def __str__(self):
+    def __str__(self) -> str:
         total_number_of_nodes = sum(self.n_nodes_per_stage)
-        return (
-            f"ScenarioTree: Stages = {self.n_stages}, Nodes = {total_number_of_nodes}"
-        )
+        return f"ScenarioTree: Stages = {self.n_stages}, Nodes = {total_number_of_nodes}"
 
     def get_node(self, stage, index):
         return self.nodes[stage][index]
@@ -58,7 +58,7 @@ class ScenarioTree:
 
 
 class Stage:
-    def __init__(self, stage_num, n_nodes, params=None):
+    def __init__(self, stage_num, n_nodes, params=None) -> None:
         self.stage_num = stage_num
         self.nodes = [Node(i, self.stage_num) for i in range(n_nodes)]
         self.cut_gradients = []
@@ -75,7 +75,7 @@ class Stage:
 
 
 class IterableWrapper:
-    def __init__(self, iterable, reversed=False):
+    def __init__(self, iterable, reversed=False) -> None:
         self.iterable = iterable
         self.reversed = reversed
         self.index = -1 if reversed else 0

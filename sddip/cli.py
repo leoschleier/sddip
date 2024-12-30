@@ -1,11 +1,10 @@
-import logging
-import os
-from typing import Callable, List, Union
 import argparse
 import datetime as dt
+import logging
+import os
+from collections.abc import Callable
 
 from . import config
-
 from .operators import classical_runner, dynamic_runner, extensive_runner
 from .scripts import (
     clear_result_directories,
@@ -14,12 +13,10 @@ from .scripts import (
     gather_latest_results,
 )
 
-
 logger = logging.getLogger(__name__)
 
 
-
-def main(argv: List[str]):
+def main(argv: list[str]) -> None:
     """Run the command line interface."""
     args = _parse_arguments(argv)
 
@@ -43,16 +40,14 @@ def main(argv: List[str]):
     logger.info("Job completed")
 
 
-def _parse_arguments(argv: List[str]) -> argparse.Namespace:
+def _parse_arguments(argv: list[str]) -> argparse.Namespace:
     """Parse the command line arguments."""
     parser = _create_argument_parser()
-    args = parser.parse_args(argv)
-    return args
+    return parser.parse_args(argv)
 
 
 def _create_argument_parser() -> argparse.ArgumentParser:
     """Create an argument parser for the command line interface."""
-
     parser = argparse.ArgumentParser(description="Dynamic SDDIP")
 
     parser.add_argument(
@@ -88,7 +83,7 @@ def _create_argument_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def _init_logging(verbose: bool = False, no_files: bool = False):
+def _init_logging(verbose: bool = False, no_files: bool = False) -> None:
     """Initialize the logging."""
     if not os.path.exists(config.LOGS_DIR):
         os.makedirs(config.LOGS_DIR)
@@ -96,10 +91,7 @@ def _init_logging(verbose: bool = False, no_files: bool = False):
     now_str = dt.datetime.now().strftime("%Y%m%d%H%M%S")
     log_file = config.LOGS_DIR / f"{now_str}_logs.txt"
 
-    if verbose:
-        log_level = logging.DEBUG
-    else:
-        log_level = logging.INFO
+    log_level = logging.DEBUG if verbose else logging.INFO
 
     handlers = [logging.StreamHandler()]
 
@@ -113,16 +105,15 @@ def _init_logging(verbose: bool = False, no_files: bool = False):
     )
 
 
-def _get_run_func(args: argparse.Namespace) -> Union[Callable, None]:
+def _get_run_func(args: argparse.Namespace) -> Callable | None:
     """Return the function to run based on the command line arguments."""
     if args.classical:
         return classical_runner.main
-    elif args.dynamic:
+    if args.dynamic:
         return dynamic_runner.main
-    elif args.extensive:
+    if args.extensive:
         return extensive_runner.main
-    else:
-        return None
+    return None
 
 
 def _execute_aux_func(args: argparse.Namespace) -> bool:

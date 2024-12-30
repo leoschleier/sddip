@@ -35,8 +35,6 @@ def create_scenario_data(test_case: str, t: int, n: int) -> None:
 
     renewables_buses = [b for b in range(n_buses) if re_max_frac[b] != 0]
 
-    [frac * sum(demands) for frac in re_max_frac if frac != 0]
-
     # Generate scenarios
     sc_generator = scenarios.ScenarioGenerator(t, n)
 

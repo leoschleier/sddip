@@ -1,4 +1,3 @@
-import math
 import os
 
 import pandas as pd
@@ -13,7 +12,6 @@ def create_supplementary_data(test_case: str, t: int, n: int) -> None:
     # (%/100 of rated capacity per unit time)
     ramp_rate = 0.2
     # Min up/-down time
-    up_down_factor = 4
 
     # Parameter retrieval
     test_case_raw_dir = os.path.join(config.TEST_CASES_DIR, test_case, "raw")
@@ -22,13 +20,11 @@ def create_supplementary_data(test_case: str, t: int, n: int) -> None:
     )
 
     gen_file = os.path.join(test_case_raw_dir, "gen_data.txt")
-    scenario_file = os.path.join(test_case_scenario_dir, "scenario_data.txt")
     supplementary_file_path = os.path.join(
         test_case_scenario_dir, "gen_sup_data.txt"
     )
 
     gen_df = pd.read_csv(gen_file, delimiter=r"\s+")
-    scenario_df = pd.read_csv(scenario_file, delimiter=r"\s+")
 
     rated_capacities = gen_df["Pmax"].values.tolist()
     buses = gen_df["bus"].values.tolist()
@@ -39,8 +35,6 @@ def create_supplementary_data(test_case: str, t: int, n: int) -> None:
 
     # Generate min up-/down-time
     n_gens = len(rated_capacities)
-    n_stages = scenario_df["t"].max()
-    int(math.ceil(1 / up_down_factor * n_stages))
 
     min_up_time = [2] * n_gens
     min_down_time = min_up_time

@@ -8,8 +8,8 @@ logger = logging.getLogger(__name__)
 
 def main() -> None:
     # Parameters
-    test_case = "WB5"
-    n_stages = 6
+    test_case = "case14"
+    n_stages = 8
     n_realizations = 6
     n_nodes = (n_realizations**n_stages - 1) // (n_realizations - 1)
     logger.info(
@@ -31,7 +31,7 @@ def main() -> None:
     log_dir = log_manager.create_log_dir("log")
 
     # Dual solver
-    ds_tolerance = 10**-6
+    ds_tolerance = 10**-4
     ds_max_iterations = 5000
     dual_solver = dualsolver.BundleMethod(
         ds_max_iterations,

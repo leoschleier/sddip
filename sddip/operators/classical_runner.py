@@ -8,7 +8,7 @@ logger = logging.getLogger(__name__)
 
 def main() -> None:
     # Parameters
-    test_case = "case6ww"
+    test_case = "case30"
     n_stages = 8
     n_realizations = 6
     n_nodes = (n_realizations**n_stages - 1) // (n_realizations - 1)
@@ -17,22 +17,22 @@ def main() -> None:
     )
     logger.info("Total number of nodes: %s", n_nodes)
 
-    init_n_binaries = 10
-    n_iterations = 10
+    init_n_binaries = 15
+    n_iterations = 100
     time_limit_minutes = 5 * 60
 
     # Number of iterations after an unchanging
     # lower bound is considered stabilized
     stop_stabilization_count = 1000
-    refinement_stabilization_count = 1
+    refinement_stabilization_count = 5
 
     # Logger
     log_manager = sddip_logging.LogManager()
     log_dir = log_manager.create_log_dir("log")
 
     # Dual solver
-    ds_tolerance = 10**-6
-    ds_max_iterations = 10000
+    ds_tolerance = 10**-4
+    ds_max_iterations = 5000
     dual_solver = dualsolver.BundleMethod(
         ds_max_iterations,
         ds_tolerance,

@@ -3,7 +3,6 @@ import logging
 import os
 import time
 from abc import ABC, abstractmethod
-from typing import Optional, Tuple
 
 import gurobipy as gp
 import numpy as np
@@ -14,13 +13,15 @@ logger = logging.getLogger(__name__)
 
 
 class SolverResults:
-    def __init__(self):
+    def __init__(self) -> None:
         self.obj_value = None
         self.multipliers = None
         self.solver_time = None
         self.n_iterations = None
 
-    def set_values(self, obj_value, multipliers, n_iterations, solver_time):
+    def set_values(
+        self, obj_value, multipliers, n_iterations, solver_time
+    ) -> None:
         self.obj_value = obj_value
         self.multipliers = multipliers
         self.n_iterations = n_iterations
@@ -30,7 +31,7 @@ class SolverResults:
 class DualSolver(ABC):
     def __init__(
         self, max_iterations: int, tolerance: float, log_dir: str, tag: str
-    ):
+    ) -> None:
         self.tag = tag
 
         log_manager = sddip_logging.LogManager()
@@ -51,7 +52,7 @@ class DualSolver(ABC):
         self.results = SolverResults()
 
     @abstractmethod
-    def solve(self, *args, **kwargs) -> Tuple[gp.Model, SolverResults]:
+    def solve(self, *args, **kwargs) -> tuple[gp.Model, SolverResults]:
         """Solve the dual problem."""
 
     def get_subgradient_and_value(
@@ -60,8 +61,8 @@ class DualSolver(ABC):
         objective_terms,
         relaxed_terms,
         dual_multipliers,
-        time_limit: Optional[float] = None,
-    ) -> Tuple[np.ndarray, float]:
+        time_limit: float | None = None,
+    ) -> tuple[np.ndarray, float]:
         """Compute the subgradient and the objective value of the dual
         problem.
         """
@@ -80,7 +81,7 @@ class DualSolver(ABC):
         if time_limit is not None:
             model.setParam(
                 "TimeLimit",
-                max(time_limit * 60, 10)
+                max(time_limit * 60, 10),
                 # Ensure that Gurobi has enough time to find at least a
                 # feasible point. Otherwise, retrieving the variable
                 # values would fail.
@@ -95,7 +96,7 @@ class DualSolver(ABC):
 
         return (subgradient, opt_value)
 
-    def on_solver_call(self):
+    def on_solver_call(self) -> None:
         self.n_calls += 1
         self.solver_time = 0
         self.log_task_start()
@@ -107,8 +108,8 @@ class DualSolver(ABC):
         lowest_gradient_magnitude: float,
         best_lower_bound: float,
         method: str = "",
-        n_serious_steps: Optional[int] = None,
-    ):
+        n_serious_steps: int | None = None,
+    ) -> None:
         if n_serious_steps is not None:
             n_null_steps = iteration - n_serious_steps
             steps = f", ns/ss: {n_null_steps}/{n_serious_steps}"
@@ -127,10 +128,10 @@ class DualSolver(ABC):
             best_lower_bound,
         )
 
-    def log_task_start(self):
+    def log_task_start(self) -> None:
         self.start_time = time.time()
 
-    def log_task_end(self):
+    def log_task_end(self) -> None:
         self.runtime_logger.log_task_end(
             f"{self.tag}_{self.n_calls}", self.start_time
         )
@@ -143,7 +144,7 @@ class SubgradientMethod(DualSolver):
         self,
         max_iterations: int,
         tolerance: float,
-        log_dir: str = None,
+        log_dir: str | None = None,
     ) -> None:
         super().__init__(max_iterations, tolerance, log_dir, self.TAG)
 
@@ -161,9 +162,9 @@ class SubgradientMethod(DualSolver):
         model: gp.Model,
         objective_terms,
         relaxed_terms,
-        optimal_value_estimate: float = None,
-        log_id: str = None,
-    ) -> Tuple[gp.Model, SolverResults]:
+        optimal_value_estimate: float | None = None,
+        log_id: str | None = None,
+    ) -> tuple[gp.Model, SolverResults]:
         self.on_solver_call()
         model.setParam("OutputFlag", 0)
 
@@ -205,11 +206,7 @@ class SubgradientMethod(DualSolver):
 
             gradient_magnitude = np.linalg.norm(subgradient, 2)
 
-            lowest_gm = (
-                gradient_magnitude
-                if gradient_magnitude < lowest_gm
-                else lowest_gm
-            )
+            lowest_gm = min(lowest_gm, gradient_magnitude)
 
             # Update best lower bound and mutlipliers
             if best_lower_bound < opt_value:
@@ -242,7 +239,7 @@ class SubgradientMethod(DualSolver):
                 method, subgradient, opt_value, optimal_value_estimate
             )
 
-            if not j == self.max_iterations - 1:
+            if j != self.max_iterations - 1:
                 dual_multipliers = dual_multipliers + step_size * subgradient
 
             self.log_iteration_info(j, opt_value, subgradient, step_size)
@@ -263,10 +260,12 @@ class SubgradientMethod(DualSolver):
     def get_step_size(
         self,
         method: str = "css",
-        gradient: list = [None],
-        function_value: float = None,
-        opt_value_estimate: float = None,
+        gradient: list | None = None,
+        function_value: float | None = None,
+        opt_value_estimate: float | None = None,
     ):
+        if gradient is None:
+            gradient = [None]
         step_size = None
         gradient_magnitude = (
             np.linalg.norm(gradient, 2) if any(gradient) else None
@@ -275,14 +274,14 @@ class SubgradientMethod(DualSolver):
         if method == "css":
             # Constant step size
             step_size = self.const_step_size
-        elif method == "csl" and gradient_magnitude != None:
+        elif method == "csl" and gradient_magnitude is not None:
             # Constant step length
             step_size = self.const_step_length / gradient_magnitude
         elif (
             method == "dss"
-            and gradient_magnitude != None
-            and function_value != None
-            and opt_value_estimate != None
+            and gradient_magnitude is not None
+            and function_value is not None
+            and opt_value_estimate is not None
         ):
             # Dependent step size
             # smoothed_gradient = (
@@ -294,7 +293,8 @@ class SubgradientMethod(DualSolver):
             ) / gradient_magnitude**2
 
         else:
-            raise ValueError("Incompatible arguments")
+            msg = "Incompatible arguments"
+            raise ValueError(msg)
 
         return step_size
 
@@ -303,8 +303,8 @@ class SubgradientMethod(DualSolver):
         iteration: int,
         opt_value: float,
         gradient_magnitude: float,
-        step_size: float = None,
-    ):
+        step_size: float | None = None,
+    ) -> None:
         logger.info(
             "Iteration: %s | Optimal value: %s | Gradient magnitude: %s | "
             "Step size: %s",
@@ -320,7 +320,7 @@ class SubgradientMethod(DualSolver):
         model: gp.Model,
         dual_multipliers: list,
         subgradient: list,
-    ):
+    ) -> None:
         logger.debug("Iteration %s:", iteration)
 
         logger.debug("Dual multipliers: %s", dual_multipliers)
@@ -349,9 +349,9 @@ class BundleMethod(DualSolver):
         tolerance: float,
         log_dir: str,
         predicted_ascent="abs",
-        time_limit: Optional[float] = None,
-    ):
-        """Initialize Bundle Method
+        time_limit: float | None = None,
+    ) -> None:
+        """Initialize Bundle Method.
 
         Parameters
         ----------
@@ -370,7 +370,7 @@ class BundleMethod(DualSolver):
             Time limit in seconds after which the bundle method is being
             interrupted, by default None
 
-        Raises
+        Raises:
         ------
         ValueError
             If predicted_ascent is not 'abs' or 'rel'
@@ -391,12 +391,13 @@ class BundleMethod(DualSolver):
         elif predicted_ascent == self.REL_PREDICTED_ASCENT:
             self._get_predicted_ascent = self._relative_predicted_ascent
         else:
-            raise ValueError(
+            msg = (
                 "Argument predicted_ascent is "
                 f"'{self.predicted_ascent}'. It must either be "
                 f"'{self.ABS_PREDICTED_ASCENT}' or "
                 f"'{self.REL_PREDICTED_ASCENT}'."
             )
+            raise ValueError(msg)
 
     def _absolute_predicted_ascent(
         self, current_value: float, new_value: float
@@ -412,7 +413,7 @@ class BundleMethod(DualSolver):
 
     def solve(
         self, model: gp.Model, objective_terms, relaxed_terms
-    ) -> Tuple[gp.Model, SolverResults]:
+    ) -> tuple[gp.Model, SolverResults]:
         """Solve the dual problem using the bundle method."""
         logger.debug("Bundle method started")
         start_time = time.time()
@@ -464,7 +465,7 @@ class BundleMethod(DualSolver):
 
             subproblem.setParam(
                 "TimeLimit",
-                max(time_remaining, 10)
+                max(time_remaining, 10),
                 # Ensure that Gurobi has enough time to find at least a
                 # feasible point. Otherwise, retrieving the variable
                 # values would fail.
@@ -489,7 +490,7 @@ class BundleMethod(DualSolver):
             if delta <= self.tolerance:
                 tolerance_reached = True
                 break
-            elif time.time() - start_time >= self._time_limit:
+            if time.time() - start_time >= self._time_limit:
                 time_limit_reached = True
                 break
 
@@ -615,9 +616,8 @@ class BundleMethod(DualSolver):
 
     def create_subproblem(
         self, n_dual_multipliers: int
-    ) -> Tuple[gp.Model, gp.Var, gp.tupledict]:
+    ) -> tuple[gp.Model, gp.Var, gp.tupledict]:
         """Create the bundle method's subproblem."""
-
         subproblem = gp.Model("Subproblem")
         subproblem.setParam("OutputFlag", 0)
         v = subproblem.addVar(

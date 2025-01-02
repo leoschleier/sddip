@@ -1,22 +1,21 @@
-from typing import Tuple
-import numpy as np
-import pandas as pd
 import random as rdm
 
-from .. import config
+import numpy as np
+import pandas as pd
+
+from sddip import config
 
 
 class ScenarioGenerator:
-
     h0_load_profile = pd.read_csv(config.H0_LOAD_PROFILE_FILE, delimiter="\t")
 
-    def __init__(self, n_stages, n_realizations_per_stage):
+    def __init__(self, n_stages, n_realizations_per_stage) -> None:
         if n_stages < 2:
-            raise ValueError("Number of stages must be greater than 1.")
+            msg = "Number of stages must be greater than 1."
+            raise ValueError(msg)
         if n_realizations_per_stage < 2:
-            raise ValueError(
-                "Number of realizations per stage must be greater than 1."
-            )
+            msg = "Number of realizations per stage must be greater than 1."
+            raise ValueError(msg)
         self.h0_profile = ScenarioGenerator.h0_load_profile.h0.values.tolist()
         self.n_stages = n_stages
         self.n_realizations_per_stage = n_realizations_per_stage
@@ -33,11 +32,9 @@ class ScenarioGenerator:
         max_value_targets: list,
         max_relative_variation: float,
     ) -> pd.DataFrame:
-
-        if not len(demand_buses) == len(max_value_targets):
-            raise ValueError(
-                "Number of maximum target values must equal the number of demand buses."
-            )
+        if len(demand_buses) != len(max_value_targets):
+            msg = "Number of maximum target values must equal the number of demand buses."
+            raise ValueError(msg)
 
         reduced_profile = self.reduce_profile(
             self.h0_profile, self.reduction_factor
@@ -69,7 +66,7 @@ class ScenarioGenerator:
         # Set loads for stages >1
         for t in range(1, self.n_stages):
             for n in range(1, self.n_realizations_per_stage + 1):
-                scenario_data[f"t"].append(t + 1)
+                scenario_data["t"].append(t + 1)
                 scenario_data["n"].append(n)
                 scenario_data["p"].append(1 / self.n_realizations_per_stage)
                 for b in range(len(demand_buses)):
@@ -92,10 +89,9 @@ class ScenarioGenerator:
         threshold: float,
         max_relative_variation: float,
     ) -> pd.DataFrame:
-        if not len(renewables_buses) == len(start_values):
-            raise ValueError(
-                "Number of list entries must equal the number of renewables buses."
-            )
+        if len(renewables_buses) != len(start_values):
+            msg = "Number of list entries must equal the number of renewables buses."
+            raise ValueError(msg)
 
         scenario_data = {"t": [1], "n": [1], "p": [1]}
 
@@ -131,7 +127,7 @@ class ScenarioGenerator:
         # Set loads for stages >1
         for t in range(1, self.n_stages):
             for n in range(1, self.n_realizations_per_stage + 1):
-                scenario_data[f"t"].append(t + 1)
+                scenario_data["t"].append(t + 1)
                 scenario_data["n"].append(n)
                 scenario_data["p"].append(1 / self.n_realizations_per_stage)
                 for b in range(len(renewables_buses)):
@@ -176,7 +172,7 @@ class ScenarioGenerator:
 
     def create_bus_keys(
         self, n_buses: int, active_buses: list, label: str
-    ) -> Tuple:
+    ) -> tuple:
         active_bus_keys = []
         inactive_bus_keys = []
 
@@ -198,9 +194,8 @@ class ScenarioGenerator:
 
     def reduce_profile(self, values: list, reduction_factor: int) -> list:
         if len(values) % reduction_factor != 0:
-            raise ValueError(
-                "Number of values to be reduced must be divisible by the reduction factor."
-            )
+            msg = "Number of values to be reduced must be divisible by the reduction factor."
+            raise ValueError(msg)
 
         values = np.array(values)
 
@@ -217,7 +212,7 @@ class ScenarioGenerator:
 
 
 class ScenarioSampler:
-    def __init__(self, n_stages: int, n_realizations_per_stage: int):
+    def __init__(self, n_stages: int, n_realizations_per_stage: int) -> None:
         self.n_stages = n_stages
         self.n_realizations_per_stage = n_realizations_per_stage
 

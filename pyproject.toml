@@ -1,28 +1,54 @@
-[tool.black]
+[tool.poetry]
+name = "sddip"
+version = "0.1.0"
+description = "Stochastic Dual Dynamic Integer Programming"
+authors = ["Leo Schleier <43878374+leoschleier@users.noreply.github.com>"]
+license = "MIT"
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.11"
+pandas = "^2.2.3"
+gurobipy = "^12.0.0"
+scipy = "^1.14.1"
+matplotlib = "^3.10.0"
+numpy = "^2.2.1"
+
+[tool.poetry.group.dev.dependencies]
+ruff = "^0.7.4"
+pyright = "^1.1.391"
+pytest = "^8.3.4"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.pyright]
+venvPath = "."
+venv = ".venv"
+typeCheckingMode = "basic"
+pythonVersion = "3.11"
+
+[tool.ruff]
 line-length = 79
-force-exclude = '''
-/(
-   \.direnv
-  |\.eggs
-  |\.git
-  |\.hg
-  |\.mypy_cache
-  |\.nox
-  |\.tox
-  |\.venv
-  |venv
-  |\.svn
-  |\.ipynb_checkpoints
-  |_build
-  |buck-out
-  |build
-  |dist
-  |__pypackages__
-)/
-'''
+target-version = "py311"
 
-[tool.isort]
-profile = "black"
+[tool.ruff.lint]
+select = ["ALL"]
+ignore = [
+    "ANN401",  # Use of typing.Any  
+    "COM812",  # Missing trailing comma (formatter)
+    "ISC001",  # Single line implicit string concatenation (formatter)
+]
+fixable = ["ALL"]
 
-[tool.pylint.'MESSAGES CONTROL']
-max-line-length = 79
+[tool.ruff.lint.per-file-ignores]
+"__init__.py" = ["E401"]  # Unused import
+"tests/*" = ["S101"]  # Use of assert detected
+
+[tool.ruff.lint.pycodestyle]
+max-doc-length = 72
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+

@@ -29,7 +29,6 @@ def main(argv: list[str]) -> None:
     run_func = _get_run_func(args)
     if run_func:
         _load_tests(args.schedule)
-        breakpoint()
         run_func()
     else:
         execution_successful = _execute_aux_func(args)

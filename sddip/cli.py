@@ -6,6 +6,8 @@ import tomllib
 from collections.abc import Callable
 from pathlib import Path
 
+from sddip import session
+
 from . import config
 from .operators import classical_runner, dynamic_runner, extensive_runner
 from .scripts import (
@@ -28,7 +30,7 @@ def main(argv: list[str]) -> None:
 
     run_func = _get_run_func(args)
     if run_func:
-        _load_tests(args.schedule)
+        _load_session(args.session)
         run_func()
     else:
         execution_successful = _execute_aux_func(args)
@@ -83,10 +85,10 @@ def _create_argument_parser() -> argparse.ArgumentParser:
     parser.add_argument("-n", type=int, required=False, default=None)
     parser.add_argument("--test-case", type=str, required=False, default=None)
     parser.add_argument(
-        "--setup",
+        "--session",
         type=Path,
         required=False,
-        default=Path("setup.toml"),
+        default=Path("session.toml"),
         help="Path to the TOML file containing the test schedule.",
     )
 
@@ -115,7 +117,7 @@ def _init_logging(verbose: bool = False, no_files: bool = False) -> None:
     )
 
 
-def _load_tests(path: Path) -> list[config.TestSetup]:
+def _load_session(path: Path) -> session.Setup:
     """Load the list of tests to run from the schedule file."""
     with path.open("rb") as f:
         setup = tomllib.load(f)
@@ -128,13 +130,13 @@ def _load_tests(path: Path) -> list[config.TestSetup]:
 
     root = Path(tests.get("root", "."))
 
-    test_configs = []
+    session_setup = []
     for conf in tests["cases"]:
-        test_configs.append(
-            config.TestSetup(name=conf["name"], path=root / conf["path"])
+        session_setup.append(
+            session.TestSetup(name=conf["name"], path=root / conf["path"])
         )
 
-    return test_configs
+    return session_setup
 
 
 def _get_run_func(args: argparse.Namespace) -> Callable | None:

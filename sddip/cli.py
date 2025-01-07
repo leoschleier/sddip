@@ -2,7 +2,9 @@ import argparse
 import datetime as dt
 import logging
 import os
+import tomllib
 from collections.abc import Callable
+from pathlib import Path
 
 from . import config
 from .operators import classical_runner, dynamic_runner, extensive_runner
@@ -26,6 +28,8 @@ def main(argv: list[str]) -> None:
 
     run_func = _get_run_func(args)
     if run_func:
+        _load_tests(args.schedule)
+        breakpoint()
         run_func()
     else:
         execution_successful = _execute_aux_func(args)
@@ -79,6 +83,13 @@ def _create_argument_parser() -> argparse.ArgumentParser:
     parser.add_argument("-t", type=int, required=False, default=None)
     parser.add_argument("-n", type=int, required=False, default=None)
     parser.add_argument("--test-case", type=str, required=False, default=None)
+    parser.add_argument(
+        "--setup",
+        type=Path,
+        required=False,
+        default=Path("setup.toml"),
+        help="Path to the TOML file containing the test schedule.",
+    )
 
     return parser
 
@@ -93,7 +104,7 @@ def _init_logging(verbose: bool = False, no_files: bool = False) -> None:
 
     log_level = logging.DEBUG if verbose else logging.INFO
 
-    handlers = [logging.StreamHandler()]
+    handlers: list[logging.Handler] = [logging.StreamHandler()]
 
     if not no_files:
         handlers.append(logging.FileHandler(log_file))
@@ -103,6 +114,28 @@ def _init_logging(verbose: bool = False, no_files: bool = False) -> None:
         level=log_level,
         handlers=handlers,
     )
+
+
+def _load_tests(path: Path) -> list[config.TestSetup]:
+    """Load the list of tests to run from the schedule file."""
+    with path.open("rb") as f:
+        setup = tomllib.load(f)
+
+    tests = setup.get("tests")
+
+    if not tests:
+        msg = "No test config found."
+        raise Exception(msg)
+
+    root = Path(tests.get("root", "."))
+
+    test_configs = []
+    for conf in tests["cases"]:
+        test_configs.append(
+            config.TestSetup(name=conf["name"], path=root / conf["path"])
+        )
+
+    return test_configs
 
 
 def _get_run_func(args: argparse.Namespace) -> Callable | None:

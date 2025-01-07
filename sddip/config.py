@@ -5,6 +5,7 @@ package.
 import logging
 import os
 from pathlib import Path
+from typing import NamedTuple
 
 logger = logging.getLogger(__name__)
 
@@ -35,3 +36,8 @@ if __name__ == "__main__":
             logger.info("%s directory exists.", label)
         else:
             logger.warning("%s directory does not exists.", label)
+
+
+class TestSetup(NamedTuple):
+    name: str
+    path: Path

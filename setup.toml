@@ -1,0 +1,13 @@
+title = "Test Schedule"
+
+[tests]
+
+# The root directory where all the test cases are stored.
+# The path is relative to present working directory.
+root = "data/01_test_cases"
+
+# List of test cases to be executed sequentially.
+cases = [
+    { name = "WB5_t06_n03", path = "WB5/t06_n03" },
+    { name = "WB5_t06_n03", path = "WB5/t06_n03" },
+]

@@ -1,10 +1,8 @@
 import logging
-import os
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
-
-from sddip import config
 
 from . import utils
 
@@ -14,46 +12,28 @@ logger = logging.getLogger(__name__)
 class Parameters:
     def __init__(
         self,
-        test_case_name: str,
-        n_stages: int,
-        n_realizations: int,
-        raw_directory: str = "raw",
-        bus_file="bus_data.txt",
-        branch_file="branch_data.txt",
-        gen_file="gen_data.txt",
-        gen_cost_file="gen_cost_data.txt",
-        gen_sup_file="gen_sup_data.txt",
-        renewables_file="ren_data.txt",
-        storage_file="storage_data.txt",
-        scenario_file="scenario_data.txt",
+        path: Path,
+        bus_file: str = "bus_data.txt",
+        branch_file: str = "branch_data.txt",
+        gen_file: str = "gen_data.txt",
+        gen_cost_file: str = "gen_cost_data.txt",
+        gen_sup_file: str = "gen_sup_data.txt",
+        renewables_file: str = "ren_data.txt",
+        storage_file: str = "storage_data.txt",
+        scenario_file: str = "scenario_daa.txt",
     ) -> None:
-        raw_data_dir = os.path.join(
-            config.TEST_CASES_DIR, test_case_name, raw_directory
-        )
-        scenario_str = (
-            f"t{str(n_stages).zfill(2)}_n{str(n_realizations).zfill(2)}"
-        )
-        scenario_data_dir = os.path.join(
-            config.TEST_CASES_DIR, test_case_name, scenario_str
-        )
-
-        raw_data_importer = DataImporter(raw_data_dir)
-        scenario_data_importer = DataImporter(scenario_data_dir)
+        """Initialize `Paramters` object from files."""
+        importer = DataImporter(path)
 
         # DataFrames
-        self.bus_df = raw_data_importer.dataframe_from_csv(bus_file)
-        self.branch_df = raw_data_importer.dataframe_from_csv(branch_file)
-        self.gen_df = raw_data_importer.dataframe_from_csv(gen_file)
-        self.gen_cost_df = raw_data_importer.dataframe_from_csv(gen_cost_file)
-        self.ren_df = raw_data_importer.dataframe_from_csv(renewables_file)
-        self.storage_df = raw_data_importer.dataframe_from_csv(storage_file)
-
-        self.gen_sup_df = scenario_data_importer.dataframe_from_csv(
-            gen_sup_file
-        )
-        self.scenario_df = scenario_data_importer.dataframe_from_csv(
-            scenario_file
-        )
+        self.bus_df = importer.dataframe_from_csv(bus_file)
+        self.branch_df = importer.dataframe_from_csv(branch_file)
+        self.gen_df = importer.dataframe_from_csv(gen_file)
+        self.gen_cost_df = importer.dataframe_from_csv(gen_cost_file)
+        self.ren_df = importer.dataframe_from_csv(renewables_file)
+        self.storage_df = importer.dataframe_from_csv(storage_file)
+        self.gen_sup_df = importer.dataframe_from_csv(gen_sup_file)
+        self.scenario_df = importer.dataframe_from_csv(scenario_file)
 
         # Structural data
         self.ptdf = None
@@ -294,11 +274,10 @@ class Parameters:
 
 
 class DataImporter:
-    def __init__(self, data_directory: str | None = None) -> None:
-        self.data_directory = data_directory if data_directory else ""
+    def __init__(self, path: Path) -> None:
+        self._path = path
 
     def dataframe_from_csv(
-        self, file_path: str, delimiter: str = r"\s+"
+        self, file_name: str, delimiter: str = r"\s+"
     ) -> pd.DataFrame:
-        path = os.path.join(self.data_directory, file_path)
-        return pd.read_csv(path, sep=delimiter)
+        return pd.read_csv(self._path / file_name, sep=delimiter)

@@ -1,10 +1,12 @@
 import logging
-from enum import Enum
+from pathlib import Path
 from time import time
 
 import gurobipy as gp
 import numpy as np
 from scipy import linalg, stats
+
+from sddip.sddip import common
 
 from . import (
     dualsolver,
@@ -20,21 +22,10 @@ from .constants import ResultKeys
 logger = logging.getLogger(__name__)
 
 
-logger = logging.getLogger(__name__)
-
-
-class CutModes(Enum):
-    BENDERS = "b"
-    STRENGTHENED_BENDERS = "sb"
-    LAGRANGIAN = "l"
-
-
 class Algorithm:
     def __init__(
         self,
-        test_case: str,
-        n_stages: int,
-        n_realizations: int,
+        path: Path,
         log_dir: str,
         dual_solver: dualsolver.DualSolver,
     ) -> None:
@@ -42,9 +33,7 @@ class Algorithm:
         self.runtime_logger = sddip_logging.RuntimeLogger(log_dir)
 
         # Problem specific parameters
-        self.problem_params = parameters.Parameters(
-            test_case, n_stages, n_realizations
-        )
+        self.problem_params = parameters.Parameters(path)
 
         # Algorithm paramters
         self.n_binaries = 10
@@ -68,8 +57,8 @@ class Algorithm:
 
         self.dual_solver = dual_solver
 
-        self.primary_cut_mode = CutModes.STRENGTHENED_BENDERS
-        self.secondary_cut_mode = CutModes.LAGRANGIAN
+        self.primary_cut_mode = common.CutType.STRENGTHENED_BENDERS
+        self.secondary_cut_mode = common.CutType.LAGRANGIAN
 
         self.n_samples_primary = 3
         self.n_samples_secondary = 1
@@ -219,17 +208,20 @@ class Algorithm:
             # Backward pass
             ########################################
             backward_pass_start_time = time()
-            if self.current_cut_mode == CutModes.LAGRANGIAN:
+            if self.current_cut_mode == common.CutType.LAGRANGIAN:
                 lagrangian_cut_iterations.append(i)
                 self.backward_pass(i + 1, samples)
-                self.cut_types_added.update([CutModes.LAGRANGIAN])
+                self.cut_types_added.update([common.CutType.LAGRANGIAN])
             elif self.current_cut_mode in [
-                CutModes.BENDERS,
-                CutModes.STRENGTHENED_BENDERS,
+                common.CutType.BENDERS,
+                common.CutType.STRENGTHENED_BENDERS,
             ]:
                 self.backward_benders(i + 1, samples)
                 self.cut_types_added.update(
-                    [CutModes.BENDERS, CutModes.STRENGTHENED_BENDERS]
+                    [
+                        common.CutType.BENDERS,
+                        common.CutType.STRENGTHENED_BENDERS,
+                    ]
                 )
             self.runtime_logger.log_task_end(
                 f"backward_pass_i{i+1}", backward_pass_start_time
@@ -351,31 +343,6 @@ class Algorithm:
                 # Solve problem
                 uc_fw.disable_output()
                 uc_fw.model.optimize()
-                # if len(samples) < 3:
-                #     total_slack = uc_fw.delta.x
-                #     total_slack += uc_fw.ys_n.x + uc_fw.ys_p.x
-                #     y_slack = uc_fw.ys_n.x + uc_fw.ys_p.x
-                #     s_slack = 0
-                #     for s in range(self.problem_params.n_storages):
-                #         total_slack += uc_fw.socs_n[s].x + uc_fw.socs_p[s].x
-                #         s_slack += uc_fw.socs_n[s].x + uc_fw.socs_p[s].x
-                #     x_slack = 0
-                #     for x_p in uc_fw.x_bs_p:
-                #         for val in x_p:
-                #             total_slack += val.x
-                #             x_slack += val.x
-                #     for x_n in uc_fw.x_bs_n:
-                #         for val in x_n:
-                #             total_slack += val.x
-                #             x_slack += val.x
-                #     logger.info(f"Total Slack: {total_slack}")
-                # logger.info(f"Delta-Slack: {uc_fw.delta.x}")
-                # logger.info(f"s-Slack: {s_slack}")
-                # logger.info(f"x-Slack: {x_slack}")
-                # logger.info(f"y-Slack: {y_slack}")
-                #     if total_slack > 20:
-                #         logger.info(f"Model export: Stage {t}")
-                #         uc_fw.model.write("model.lp")
 
                 try:
                     x_kt = [x_g.x for x_g in uc_fw.x]
@@ -667,12 +634,13 @@ class Algorithm:
 
                     dual_multipliers.append(dm)
 
-                    if self.current_cut_mode == CutModes.BENDERS:
+                    if self.current_cut_mode == common.CutType.BENDERS:
                         opt_values.append(
                             uc_fw.model.getObjective().getValue()
                         )
                     elif (
-                        self.current_cut_mode == CutModes.STRENGTHENED_BENDERS
+                        self.current_cut_mode
+                        == common.CutType.STRENGTHENED_BENDERS
                     ):
                         dual_model = ucmodelclassical.ClassicalModel(
                             self.problem_params.n_buses,
@@ -831,7 +799,7 @@ class Algorithm:
         model_builder.add_cut_lower_bound(self.problem_params.cut_lb[stage])
 
         if stage < self.problem_params.n_stages - 1 and iteration > 0:
-            if CutModes.LAGRANGIAN in self.cut_types_added:
+            if common.CutType.LAGRANGIAN in self.cut_types_added:
                 lagrangian_coefficients = self.cc_storage.get_stage_result(
                     stage
                 )
@@ -841,7 +809,7 @@ class Algorithm:
                 )
             if bool(
                 self.cut_types_added
-                & {CutModes.BENDERS, CutModes.STRENGTHENED_BENDERS}
+                & {common.CutType.BENDERS, common.CutType.STRENGTHENED_BENDERS}
             ):
                 benders_coefficients = self.bc_storage.get_stage_result(stage)
                 model_builder.add_benders_cuts(

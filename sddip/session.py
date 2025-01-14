@@ -31,6 +31,8 @@ class TestSetup:
     sddip_refinment_stabilization_count: int = field(default=5)
     sddip_stop_stabilization_count: int = field(default=1000)
 
+    sddip_no_improvement_tolerance: float = field(default=10**-6)
+
     sddip_primary_cut_type: str = field(default="sb")
     sddip_n_samples_primary: int = field(default=3)
     sddip_secondary_cut_type: str = field(default="l")
@@ -103,6 +105,10 @@ def run(setup: TestSetup) -> None:
     algo.n_samples_secondary = setup.sddip_n_samples_secondary
 
     algo.time_limit_minutes = setup.sddip_time_limit
+    
+    # Tolerance over which an increase in the lower bound is considered
+    # as an improvement.
+    algo.no_improvement_tolerance = setup.sddip_no_improvement_tolerance
 
     # Number of iterations after an non-improving lower bound is
     # considered stabilized.

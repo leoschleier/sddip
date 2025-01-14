@@ -121,7 +121,9 @@ def run(setup: TestSetup) -> None:
         try:
             # Manage results
             results_manager = storage.ResultsManager()
-            results_dir = results_manager.create_results_dir(f"results_{setup.name}")
+            results_dir = results_manager.create_results_dir(
+                f"results_{setup.name}"
+            )
             algo.bound_storage.export_results(results_dir)
             algo.ps_storage.export_results(results_dir)
             algo.ds_storage.export_results(results_dir)

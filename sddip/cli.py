@@ -83,10 +83,12 @@ def _create_argument_parser() -> argparse.ArgumentParser:
 
     return parser
 
+
 def _path(s: str) -> Path:
     p = Path(s)
     if not p.exists():
-        raise ValueError(f"Path '{p.resolve().absolute()}' does not exist.")
+        msg = f"Path '{p.resolve().absolute()}' does not exist."
+        raise ValueError(msg)
     return Path(s)
 
 

@@ -86,6 +86,9 @@ def run(setup: TestSetup) -> None:
                 dual_solver=dual_solver,
             )
             algo.big_m = setup.sddip_projection_big_m
+            algo.refinement_stabilization_count = (
+                setup.sddip_refinment_stabilization_count
+            )
             algo.sos = False
 
     algo.n_binaries = setup.sddip_n_binaries
@@ -104,22 +107,21 @@ def run(setup: TestSetup) -> None:
     # Number of iterations after an non-improving lower bound is
     # considered stabilized.
     algo.stop_stabilization_count = setup.sddip_stop_stabilization_count
-    algo.refinement_stabilization_count = (
-        setup.sddip_refinment_stabilization_count
-    )
     algo.n_samples_final_ub = setup.sddip_n_samples_final_ub
 
     # Execution
     try:
         algo.run(setup.sddip_max_iterations)
     except KeyboardInterrupt:
-        logger.warning("Shutdown request ... exiting")
+        logger.warning("Shutdown request received. Exiting...")
         raise
+    except Exception:
+        logger.exception("Execution failed: %s")
     finally:
         try:
             # Manage results
             results_manager = storage.ResultsManager()
-            results_dir = results_manager.create_results_dir("results")
+            results_dir = results_manager.create_results_dir(f"results_{setup.name}")
             algo.bound_storage.export_results(results_dir)
             algo.ps_storage.export_results(results_dir)
             algo.ds_storage.export_results(results_dir)
@@ -130,5 +132,6 @@ def run(setup: TestSetup) -> None:
             if algo.cut_types_added - {common.CutType.LAGRANGIAN}:
                 algo.bc_storage.export_results(results_dir)
 
-        except ValueError as ex:
-            logger.exception("Export incomplete: %s", ex)
+        except Exception:
+            logger.exception("Export incomplete: %s")
+            raise

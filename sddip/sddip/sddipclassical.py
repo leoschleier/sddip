@@ -40,11 +40,8 @@ class Algorithm:
         self.error_threshold = 10 ** (-1)
         self.max_n_binaries = 10
         # Absolute change in lower bound
-        self.refinement_tolerance = 10 ** (-8)
         self.no_improvement_tolerance = 10 ** (-8)
         self.stop_stabilization_count = 5
-        self.refinement_stabilization_count = 2
-        self.big_m = 10**6
         self.time_limit_minutes = 5 * 60
         self.n_samples_final_ub = 150
 

@@ -10,7 +10,7 @@ path = "data/01_test_cases/WB5/t06_n03"
 
 algorithm = "sddip"  # Standard SDDiP
 
-sddip_n_binaries = 5
+sddip_n_binaries = 15
 
 sddip_max_iterations = 100
 sddip_time_limit = 300

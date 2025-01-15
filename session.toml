@@ -1,0 +1,61 @@
+title = "Test Session"
+
+[tests]
+
+# Test cases to be executed sequentially.
+[[tests.cases]]
+
+name = "WB5_t06_n03_dsddip"
+path = "data/01_test_cases/WB5/t06_n03"
+
+algorithm = "sddip"  # Standard SDDiP
+
+sddip_n_binaries = 15
+
+sddip_max_iterations = 100
+sddip_time_limit = 300
+
+sddip_stop_stabilization_count = 1000
+
+sddip_no_improvement_tolerance = 0.00001
+
+sddip_primary_cut_type = "sb"
+sddip_n_samples_primary = 3
+sddip_secondary_cut_type = "l"
+sddip_n_samples_secondary = 1
+
+sddip_n_samples_final_ub = 300
+
+dual_solver_stop_tolerance = 0.00001
+dual_solver_time_limit = 300
+dual_solver_max_iterations = 5000
+
+[[tests.cases]]
+
+name = "WB5_t06_n03_dsddip"
+path = "data/01_test_cases/WB5/t06_n03"
+
+algorithm = "dsddip"  # Dynamic SDDiP
+
+sddip_n_binaries = 5
+
+sddip_max_iterations = 100
+sddip_time_limit = 300
+
+sddip_refinment_stabilization_count = 5
+sddip_stop_stabilization_count = 1000
+
+sddip_no_improvement_tolerance = 0.00001
+
+sddip_primary_cut_type = "sb"
+sddip_n_samples_primary = 3
+sddip_secondary_cut_type = "l"
+sddip_n_samples_secondary = 1
+
+sddip_projection_big_m = 10_000
+
+sddip_n_samples_final_ub = 300
+
+dual_solver_stop_tolerance = 0.00001
+dual_solver_time_limit = 300
+dual_solver_max_iterations = 5000

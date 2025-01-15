@@ -11,12 +11,12 @@ class ResultsManager:
         pass
 
     def create_results_dir(self, dir_label: str) -> str:
-        start_time_str = datetime.today().strftime("%Y_%m_%d__%H_%M_%S")
+        start_time_str = datetime.today().strftime("%Y%m%d%H%M%S")
         dir_name = f"{dir_label}_{start_time_str}"
         results_dir = config.RESULTS_DIR / dir_name
         os.makedirs(results_dir)
 
-        return results_dir
+        return str(results_dir.resolve())
 
 
 class ResultStorage:

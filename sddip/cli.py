@@ -2,10 +2,13 @@ import argparse
 import datetime as dt
 import logging
 import os
-from collections.abc import Callable
+import tomllib
+from pathlib import Path
+
+from sddip import session
 
 from . import config
-from .operators import classical_runner, dynamic_runner, extensive_runner
+from .operators import extensive_runner
 from .scripts import (
     clear_result_directories,
     create_scenarios,
@@ -18,26 +21,23 @@ logger = logging.getLogger(__name__)
 
 def main(argv: list[str]) -> None:
     """Run the command line interface."""
+    logger.info("Execute SDDIP module")
     args = _parse_arguments(argv)
 
     no_files = args.clean or args.gather
     _init_logging(args.verbose, no_files)
-    logger.info("Executing the SDDIP package.")
 
-    run_func = _get_run_func(args)
-    if run_func:
-        run_func()
+    aux_exec_successful = _try_execute_aux_func(args)
+
+    if aux_exec_successful:
+        logger.info("Auxiliary function executed successfully.")
+    elif args.extensive:
+        logger.info("Start extensive model")
+        extensive_runner.main()
     else:
-        execution_successful = _execute_aux_func(args)
-
-        if not execution_successful:
-            logger.warning(
-                "Abort execution. "
-                "Unknown combination of command line arguments: %s",
-                args,
-            )
-
-    logger.info("Job completed")
+        session_config = _load_session(args.session)
+        logger.info("Start test session")
+        session.start(session_config)
 
 
 def _parse_arguments(argv: list[str]) -> argparse.Namespace:
@@ -51,10 +51,11 @@ def _create_argument_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Dynamic SDDIP")
 
     parser.add_argument(
-        "--classical", action="store_true", help="Run classical SDDIP"
-    )
-    parser.add_argument(
-        "--dynamic", action="store_true", help="Run dynamic SDDIP"
+        "--session",
+        type=_path,
+        required=False,
+        default="session.toml",
+        help="Path to the TOML file containing the session config",
     )
     parser.add_argument(
         "--extensive",
@@ -83,6 +84,14 @@ def _create_argument_parser() -> argparse.ArgumentParser:
     return parser
 
 
+def _path(s: str) -> Path:
+    p = Path(s)
+    if not p.exists():
+        msg = f"Path '{p.resolve().absolute()}' does not exist."
+        raise ValueError(msg)
+    return Path(s)
+
+
 def _init_logging(verbose: bool = False, no_files: bool = False) -> None:
     """Initialize the logging."""
     if not os.path.exists(config.LOGS_DIR):
@@ -93,7 +102,7 @@ def _init_logging(verbose: bool = False, no_files: bool = False) -> None:
 
     log_level = logging.DEBUG if verbose else logging.INFO
 
-    handlers = [logging.StreamHandler()]
+    handlers: list[logging.Handler] = [logging.StreamHandler()]
 
     if not no_files:
         handlers.append(logging.FileHandler(log_file))
@@ -105,20 +114,25 @@ def _init_logging(verbose: bool = False, no_files: bool = False) -> None:
     )
 
 
-def _get_run_func(args: argparse.Namespace) -> Callable | None:
-    """Return the function to run based on the command line arguments."""
-    if args.classical:
-        return classical_runner.main
-    if args.dynamic:
-        return dynamic_runner.main
-    if args.extensive:
-        return extensive_runner.main
-    return None
+def _load_session(path: Path) -> session.Setup:
+    """Load the list of tests to run from the schedule file."""
+    with path.open("rb") as f:
+        setup = tomllib.load(f)
+
+    tests = setup.get("tests")
+
+    if not tests:
+        msg = "No test config found."
+        raise Exception(msg)
+
+    return [session.TestSetup(**case) for case in tests["cases"]]
 
 
-def _execute_aux_func(args: argparse.Namespace) -> bool:
-    """Execute one of the auxilliary functions if correctly specified in
-    the command line arguments.
+def _try_execute_aux_func(args: argparse.Namespace) -> bool:
+    """Try to execute an auxiliary function.
+
+    Return value indiactes whether an auxiliary function was executed or
+    not.
     """
     execution_successful = False
     if (

@@ -105,7 +105,7 @@ def run(setup: TestSetup) -> None:
     algo.n_samples_secondary = setup.sddip_n_samples_secondary
 
     algo.time_limit_minutes = setup.sddip_time_limit
-    
+
     # Tolerance over which an increase in the lower bound is considered
     # as an improvement.
     algo.no_improvement_tolerance = setup.sddip_no_improvement_tolerance

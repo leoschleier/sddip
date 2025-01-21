@@ -25,7 +25,7 @@ logger = logging.getLogger(__name__)
 class Algorithm:
     def __init__(
         self,
-        test_case_path: Path,
+        path: Path,
         log_dir: str,
         dual_solver: dualsolver.DualSolver,
     ) -> None:
@@ -33,9 +33,7 @@ class Algorithm:
         self.runtime_logger = sddip_logging.RuntimeLogger(log_dir)
 
         # Problem specific parameters
-        self.problem_params = parameters.Parameters(
-            test_case_path,
-        )
+        self.problem_params = parameters.Parameters(path)
 
         # Algorithm paramters
         self.n_binaries = 10

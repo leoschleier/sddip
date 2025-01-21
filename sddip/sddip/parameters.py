@@ -20,7 +20,7 @@ class Parameters:
         gen_sup_file: str = "gen_sup_data.txt",
         renewables_file: str = "ren_data.txt",
         storage_file: str = "storage_data.txt",
-        scenario_file: str = "scenario_daa.txt",
+        scenario_file: str = "scenario_data.txt",
     ) -> None:
         """Initialize `Paramters` object from files."""
         importer = DataImporter(path)

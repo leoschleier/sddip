@@ -3,8 +3,8 @@
 import logging
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Literal
-
+from typing import Literal, Any
+import time
 from sddip.sddip import (
     common,
     dualsolver,
@@ -45,6 +45,12 @@ class TestSetup:
     dual_solver_stop_tolerance: float = field(default=10**-6)
     dual_solver_time_limit: int = field(default=5 * 60)
     dual_solver_max_iterations: int = field(default=5000)
+
+    @classmethod
+    def from_dict(cls, d: dict[str, Any], /) -> "TestSetup":
+        """Create a `TestSetup` object from a dictionary."""
+        d["path"] = Path(d["path"])
+        return cls(**d)
 
 
 Setup = list[TestSetup]
@@ -143,3 +149,5 @@ def run(setup: TestSetup) -> None:
         except Exception:
             logger.exception("Export incomplete: %s")
             raise
+    
+    time.sleep(1)

@@ -23,7 +23,6 @@ def main(argv: list[str]) -> None:
     """Run the command line interface."""
     logger.info("Execute SDDIP module")
     args = _parse_arguments(argv)
-
     no_files = args.clean or args.gather
     _init_logging(args.verbose, no_files)
 
@@ -125,7 +124,7 @@ def _load_session(path: Path) -> session.Setup:
         msg = "No test config found."
         raise Exception(msg)
 
-    return [session.TestSetup(**case) for case in tests["cases"]]
+    return [session.TestSetup.from_dict(case) for case in tests["cases"]]
 
 
 def _try_execute_aux_func(args: argparse.Namespace) -> bool:

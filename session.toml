@@ -5,7 +5,7 @@ title = "Test Session"
 # Test cases to be executed sequentially.
 [[tests.cases]]
 
-name = "WB5_t06_n03_dsddip"
+name = "WB5_t06_n03_sddip"
 path = "data/01_test_cases/WB5/t06_n03"
 
 algorithm = "sddip"  # Standard SDDiP

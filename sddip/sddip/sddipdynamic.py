@@ -1,10 +1,12 @@
 import logging
-from enum import Enum
+from pathlib import Path
 from time import time
 
 import gurobipy as gp
 import numpy as np
 from scipy import linalg, stats
+
+from sddip.sddip import common
 
 from . import (
     dualsolver,
@@ -20,18 +22,10 @@ from .constants import ResultKeys
 logger = logging.getLogger(__name__)
 
 
-class CutModes(Enum):
-    BENDERS = "b"
-    STRENGTHENED_BENDERS = "sb"
-    LAGRANGIAN = "l"
-
-
 class Algorithm:
     def __init__(
         self,
-        test_case: str,
-        n_stages: int,
-        n_realizations: int,
+        path: Path,
         log_dir: str,
         dual_solver: dualsolver.DualSolver,
     ) -> None:
@@ -39,9 +33,7 @@ class Algorithm:
         self.runtime_logger = sddip_logging.RuntimeLogger(log_dir)
 
         # Problem specific parameters
-        self.problem_params = parameters.Parameters(
-            test_case, n_stages, n_realizations
-        )
+        self.problem_params = parameters.Parameters(path)
 
         # Algorithm paramters
         self.n_binaries = 10
@@ -52,8 +44,7 @@ class Algorithm:
         self.no_improvement_tolerance = 10 ** (-8)
         self.stop_stabilization_count = 5
         self.refinement_stabilization_count = 2
-        self.big_m = 10**6
-        self.big_m = 10**6
+        self.big_m: float = 10**6
         self.sos = False
         self.time_limit_minutes = 5 * 60
         self.n_samples_final_ub = 150
@@ -67,8 +58,8 @@ class Algorithm:
 
         self.dual_solver = dual_solver
 
-        self.primary_cut_mode = CutModes.STRENGTHENED_BENDERS
-        self.secondary_cut_mode = CutModes.LAGRANGIAN
+        self.primary_cut_mode = common.CutType.STRENGTHENED_BENDERS
+        self.secondary_cut_mode = common.CutType.LAGRANGIAN
 
         self.n_samples_primary = 3
         self.n_samples_secondary = 1
@@ -154,17 +145,20 @@ class Algorithm:
             # Backward pass
             ########################################
             backward_pass_start_time = time()
-            if self.current_cut_mode == CutModes.LAGRANGIAN:
+            if self.current_cut_mode == common.CutType.LAGRANGIAN:
                 lagrangian_cut_iterations.append(i)
-                self.cut_types_added.update([CutModes.LAGRANGIAN])
+                self.cut_types_added.update([common.CutType.LAGRANGIAN])
                 self.backward_pass(i + 1, samples)
 
             elif self.current_cut_mode in [
-                CutModes.BENDERS,
-                CutModes.STRENGTHENED_BENDERS,
+                common.CutType.BENDERS,
+                common.CutType.STRENGTHENED_BENDERS,
             ]:
                 self.cut_types_added.update(
-                    [CutModes.BENDERS, CutModes.STRENGTHENED_BENDERS]
+                    [
+                        common.CutType.BENDERS,
+                        common.CutType.STRENGTHENED_BENDERS,
+                    ]
                 )
                 self.backward_benders(i + 1, samples)
             self.runtime_logger.log_task_end(
@@ -351,7 +345,7 @@ class Algorithm:
 
         if (
             refinement_condition
-            and self.current_cut_mode == CutModes.LAGRANGIAN
+            and self.current_cut_mode == common.CutType.LAGRANGIAN
         ):
             logger.info("Refinement performed.")
             self.n_binaries += (
@@ -617,12 +611,13 @@ class Algorithm:
 
                     dual_multipliers.append(dm)
 
-                    if self.current_cut_mode == CutModes.BENDERS:
+                    if self.current_cut_mode == common.CutType.BENDERS:
                         opt_values.append(
                             uc_fw.model.getObjective().getValue()
                         )
                     elif (
-                        self.current_cut_mode == CutModes.STRENGTHENED_BENDERS
+                        self.current_cut_mode
+                        == common.CutType.STRENGTHENED_BENDERS
                     ):
                         dual_model = ucmodeldynamic.ForwardModelBuilder(
                             self.problem_params.n_buses,
@@ -761,7 +756,7 @@ class Algorithm:
         model_builder.add_cut_lower_bound(self.problem_params.cut_lb[stage])
 
         if stage < self.problem_params.n_stages - 1 and iteration > 0:
-            if CutModes.LAGRANGIAN in self.cut_types_added:
+            if common.CutType.LAGRANGIAN in self.cut_types_added:
                 cut_coefficients = self.cc_storage.get_stage_result(stage)
                 model_builder.add_cut_constraints(
                     cut_coefficients[ResultKeys.ci_key],
@@ -773,7 +768,7 @@ class Algorithm:
                 )
             if bool(
                 self.cut_types_added
-                & {CutModes.BENDERS, CutModes.STRENGTHENED_BENDERS}
+                & {common.CutType.BENDERS, common.CutType.STRENGTHENED_BENDERS}
             ):
                 benders_coefficients = self.bc_storage.get_stage_result(stage)
                 model_builder.add_benders_cuts(

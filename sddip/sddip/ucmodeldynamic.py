@@ -26,7 +26,7 @@ class ModelBuilder(ABC):
         self.backsight_periods = backsight_periods
         self.model = gp.Model("MILP: Unit commitment")
         self.model.setParam("OutputFlag", 0)
-        self.model.setParam("InFeasTol", 10 ** (-9))
+        self.model.setParam("IntFeasTol", 10 ** (-9))
         self.model.setParam("NumericFocus", 3)
 
         # Commitment decision

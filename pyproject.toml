@@ -4,10 +4,16 @@ version = "0.1.0"
 description = "Stochastic Dual Dynamic Integer Programming"
 authors = ["Leo Schleier <43878374+leoschleier@users.noreply.github.com>"]
 license = "MIT"
-readme = "README.md"
+readme = "docs/README.md"
+keywords = ["sddip"]
+homepage = "https://github.com/leoschleier/sddip"
+# See: https://pypi.org/classifiers/
+classifiers = [
+    "Programming Language :: Python :: 3.12",
+]
 
 [tool.poetry.dependencies]
-python = "^3.11"
+python = "~3.12"
 pandas = "^2.2.3"
 gurobipy = "^12.0.0"
 scipy = "^1.14.1"
@@ -27,11 +33,11 @@ build-backend = "poetry.core.masonry.api"
 venvPath = "."
 venv = ".venv"
 typeCheckingMode = "basic"
-pythonVersion = "3.11"
+pythonVersion = "3.12"
 
 [tool.ruff]
 line-length = 79
-target-version = "py311"
+target-version = "py312"
 
 [tool.ruff.lint]
 select = ["ALL"]

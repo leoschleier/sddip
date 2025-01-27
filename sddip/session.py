@@ -65,7 +65,7 @@ def start(setup: Setup) -> None:
 def run(setup: TestSetup) -> None:
     """Execute a single test."""
     # Parameters
-    logger.info("Test case: %", setup.name)
+    logger.info("Test case: %s", setup.name)
 
     # Logger
     log_manager = sddip_logging.LogManager()

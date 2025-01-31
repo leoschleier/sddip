@@ -15,7 +15,6 @@ test_dir = cwd / "data" / "01_test_cases"
 
 for case in test_cases:
     test_case_dir = test_dir / case
-    breakpoint()
     raw_dir = test_case_dir / "raw"
     raw_files = list(raw_dir.glob("*"))
 

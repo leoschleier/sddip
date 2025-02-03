@@ -2,16 +2,18 @@
 
 import logging
 import time
+import zoneinfo
 from dataclasses import dataclass, field
+from datetime import datetime as dt
 from pathlib import Path
 from typing import Any, Literal
 
+from sddip import config
 from sddip.sddip import (
     common,
     dualsolver,
     sddipclassical,
     sddipdynamic,
-    storage,
 )
 
 logger = logging.getLogger(__name__)
@@ -60,12 +62,15 @@ def start(setup: Setup) -> None:
     """Start the test session."""
     log_manager = LogManager()
     for _test_setup in setup:
-        results_manager = storage.ResultsManager()
-        results_dir = results_manager.create_results_dir(
-            f"results_{_test_setup.name}"
+        start_time_str = dt.now(
+            tz=zoneinfo.ZoneInfo("Europe/Berlin")
+        ).strftime("%Y%m%d%H%M%S")
+        results_dir = (
+            config.RESULTS_DIR / f"{start_time_str}_{_test_setup.name}"
         )
-        log_manager.set_up_logger(Path(results_dir) / "sddip.log")
-        run(_test_setup, results_dir)
+        results_dir.mkdir(parents=True, exist_ok=True)
+        log_manager.set_up_logger(results_dir / "sddip.log")
+        run(_test_setup, str(results_dir))
 
 
 def run(setup: TestSetup, results_dir: str) -> None:

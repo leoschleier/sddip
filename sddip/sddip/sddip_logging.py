@@ -15,7 +15,7 @@ class LogManager:
     def create_log_dir(self, dir_label: str) -> str:
         now_str = datetime.today().strftime("%Y%m%d%H%M%S")
         dir_name = f"{dir_label}_{now_str}"
-        log_dir = config.LOGS_DIR / dir_name
+        log_dir = config.RESULTS_DIR / dir_name
         os.makedirs(log_dir)
 
         return log_dir
@@ -26,8 +26,10 @@ class LogManager:
 
 
 class RuntimeLogger:
-    def __init__(self, log_dir: str) -> None:
-        self.runtime_file_path = os.path.join(log_dir, "runtime.json")
+    def __init__(self, log_dir: str, tag: str = "") -> None:
+        if tag:
+            tag = f"_{tag}"
+        self.runtime_file_path = os.path.join(log_dir, f"runtime{tag}.json")
         self.runtime_dict = {}
         self.global_start_time = None
 

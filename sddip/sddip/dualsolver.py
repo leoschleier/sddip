@@ -34,9 +34,7 @@ class DualSolver(ABC):
     ) -> None:
         self.tag = tag
 
-        log_manager = sddip_logging.LogManager()
-        runtime_log_dir = log_manager.create_log_dir(f"{self.tag}_log")
-        self.runtime_logger = sddip_logging.RuntimeLogger(runtime_log_dir)
+        self.runtime_logger = sddip_logging.RuntimeLogger(log_dir, tag)
 
         self.output_flag = False
         self.output_verbose = False

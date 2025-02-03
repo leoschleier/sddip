@@ -1,14 +1,14 @@
 """Execute a test session."""
 
 import logging
+import time
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Literal, Any
-import time
+from typing import Any, Literal
+
 from sddip.sddip import (
     common,
     dualsolver,
-    sddip_logging,
     sddipclassical,
     sddipdynamic,
     storage,
@@ -58,24 +58,26 @@ Setup = list[TestSetup]
 
 def start(setup: Setup) -> None:
     """Start the test session."""
+    log_manager = LogManager()
     for _test_setup in setup:
-        run(_test_setup)
+        results_manager = storage.ResultsManager()
+        results_dir = results_manager.create_results_dir(
+            f"results_{_test_setup.name}"
+        )
+        log_manager.set_up_logger(Path(results_dir) / "sddip.log")
+        run(_test_setup, results_dir)
 
 
-def run(setup: TestSetup) -> None:
+def run(setup: TestSetup, results_dir: str) -> None:
     """Execute a single test."""
     # Parameters
     logger.info("Test case: %s", setup.name)
-
-    # Logger
-    log_manager = sddip_logging.LogManager()
-    log_dir = log_manager.create_log_dir("log")
 
     # Dual solver
     dual_solver = dualsolver.BundleMethod(
         setup.dual_solver_max_iterations,
         setup.dual_solver_stop_tolerance,
-        log_dir,
+        results_dir,
         predicted_ascent="abs",
         time_limit=setup.dual_solver_time_limit,
     )
@@ -84,13 +86,13 @@ def run(setup: TestSetup) -> None:
         case "sddip":
             algo = sddipclassical.Algorithm(
                 setup.path,
-                log_dir,
+                results_dir,
                 dual_solver=dual_solver,
             )
         case "dsddip":
             algo = sddipdynamic.Algorithm(
                 setup.path,
-                log_dir,
+                results_dir,
                 dual_solver=dual_solver,
             )
             algo.big_m = setup.sddip_projection_big_m
@@ -132,10 +134,6 @@ def run(setup: TestSetup) -> None:
     finally:
         try:
             # Manage results
-            results_manager = storage.ResultsManager()
-            results_dir = results_manager.create_results_dir(
-                f"results_{setup.name}"
-            )
             algo.bound_storage.export_results(results_dir)
             algo.ps_storage.export_results(results_dir)
             algo.ds_storage.export_results(results_dir)
@@ -149,5 +147,18 @@ def run(setup: TestSetup) -> None:
         except Exception:
             logger.exception("Export incomplete: %s")
             raise
-    
+
     time.sleep(1)
+
+
+class LogManager:
+    def __init__(self) -> None:
+        self._fh: logging.FileHandler | None = None
+
+    def set_up_logger(self, path: Path) -> None:
+        """Set up logger."""
+        logger = logging.getLogger("sddip")
+        if self._fh:
+            logger.removeHandler(self._fh)
+        self._fh = logging.FileHandler(path)
+        logger.addHandler(self._fh)

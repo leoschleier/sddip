@@ -58,7 +58,7 @@ class ResultStorage:
             results = self.results
         else:
             results = {("n/a", "n/a", "n/a"): {"n/a": "n/a"}}
-        
+
         df = pd.DataFrame.from_dict(results, orient="index")
         return df.rename_axis(self.index_names)
 

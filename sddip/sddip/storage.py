@@ -1,22 +1,6 @@
 import os
-from datetime import datetime
 
 import pandas as pd
-
-from sddip import config
-
-
-class ResultsManager:
-    def __init__(self) -> None:
-        pass
-
-    def create_results_dir(self, dir_label: str) -> str:
-        start_time_str = datetime.today().strftime("%Y%m%d%H%M%S")
-        dir_name = f"{dir_label}_{start_time_str}"
-        results_dir = config.RESULTS_DIR / dir_name
-        os.makedirs(results_dir)
-
-        return str(results_dir.resolve())
 
 
 class ResultStorage:
@@ -58,7 +42,7 @@ class ResultStorage:
             results = self.results
         else:
             results = {("n/a", "n/a", "n/a"): {"n/a": "n/a"}}
-        
+
         df = pd.DataFrame.from_dict(results, orient="index")
         return df.rename_axis(self.index_names)
 

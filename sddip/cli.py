@@ -1,13 +1,12 @@
 import argparse
-import datetime as dt
 import logging
-import os
+import logging.config
 import tomllib
 from pathlib import Path
 
+import sddip
 from sddip import session
 
-from . import config
 from .operators import extensive_runner
 from .scripts import (
     clear_result_directories,
@@ -21,10 +20,10 @@ logger = logging.getLogger(__name__)
 
 def main(argv: list[str]) -> None:
     """Run the command line interface."""
-    logger.info("Execute SDDIP module")
     args = _parse_arguments(argv)
-    no_files = args.clean or args.gather
-    _init_logging(args.verbose, no_files)
+    _init_logging(args.verbose)
+
+    logger.info("Execute SDDIP module")
 
     aux_exec_successful = _try_execute_aux_func(args)
 
@@ -91,26 +90,13 @@ def _path(s: str) -> Path:
     return Path(s)
 
 
-def _init_logging(verbose: bool = False, no_files: bool = False) -> None:
+def _init_logging(verbose: bool = False) -> None:
     """Initialize the logging."""
-    if not os.path.exists(config.LOGS_DIR):
-        os.makedirs(config.LOGS_DIR)
+    if verbose:
+        for l in sddip.logging.config["loggers"].values():
+            l["level"] = "DEBUG"
 
-    now_str = dt.datetime.now().strftime("%Y%m%d%H%M%S")
-    log_file = config.LOGS_DIR / f"{now_str}_logs.txt"
-
-    log_level = logging.DEBUG if verbose else logging.INFO
-
-    handlers: list[logging.Handler] = [logging.StreamHandler()]
-
-    if not no_files:
-        handlers.append(logging.FileHandler(log_file))
-
-    logging.basicConfig(
-        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-        level=log_level,
-        handlers=handlers,
-    )
+    logging.config.dictConfig(sddip.logging.config)
 
 
 def _load_session(path: Path) -> session.Setup:

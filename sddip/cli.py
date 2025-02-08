@@ -1,4 +1,5 @@
 import argparse
+import contextlib
 import logging
 import logging.config
 import tomllib
@@ -21,21 +22,25 @@ logger = logging.getLogger(__name__)
 def main(argv: list[str]) -> None:
     """Run the command line interface."""
     args = _parse_arguments(argv)
-    _init_logging(args.verbose)
 
-    logger.info("Execute SDDIP module")
-
-    aux_exec_successful = _try_execute_aux_func(args)
-
-    if aux_exec_successful:
-        logger.info("Auxiliary function executed successfully.")
-    elif args.extensive:
-        logger.info("Start extensive model")
-        extensive_runner.main()
-    else:
-        session_config = _load_session(args.session)
-        logger.info("Start test session")
-        session.start(session_config)
+    match args.command:
+        case "create":
+            _init_logging(args.verbose, nofile=True)
+            _create(args)
+        case "sweep":
+            _init_logging(args.verbose, nofile=True)
+            _sweep(args)
+        case _:
+            _init_logging(args.verbose)
+            logger.info("Execute SDDIP module")
+            if args.extensive:
+                logger.info("Start extensive model")
+                extensive_runner.main()
+            else:
+                session_config = _load_session(args.session)
+                logger.info("Start test session")
+                session.start(session_config)
+            logger.info("Execution completed")
 
 
 def _parse_arguments(argv: list[str]) -> argparse.Namespace:
@@ -50,8 +55,7 @@ def _create_argument_parser() -> argparse.ArgumentParser:
 
     parser.add_argument(
         "--session",
-        type=_path,
-        required=False,
+        type=Path,
         default="session.toml",
         help="Path to the TOML file containing the session config",
     )
@@ -61,40 +65,71 @@ def _create_argument_parser() -> argparse.ArgumentParser:
         help="Run script to solve the extensive model",
     )
     parser.add_argument(
-        "--scenarios", action="store_true", help="Create scenarios"
-    )
-    parser.add_argument(
-        "--supplementary",
-        action="store_true",
-        help="Run script to create supplementary data",
-    )
-    parser.add_argument(
-        "--clean", action="store_true", help="Clean result directories"
-    )
-    parser.add_argument(
         "--verbose", action="store_true", help="Enable verbose logging"
     )
-    parser.add_argument("--gather", action="store_true", help="Gather results")
-    parser.add_argument("-t", type=int, required=False, default=None)
-    parser.add_argument("-n", type=int, required=False, default=None)
-    parser.add_argument("--test-case", type=str, required=False, default=None)
+
+    subparsers = parser.add_subparsers(
+        title="Auxiliary functions", dest="command"
+    )
+
+    create_sp = subparsers.add_parser(
+        "create", help="Create data for a new test case"
+    )
+    create_sp.add_argument(
+        "--test-case",
+        type=Path,
+        required=True,
+        default=None,
+        help="Directory for test case data",
+    )
+    create_sp.add_argument(
+        "--test-base",
+        type=Path,
+        default=None,
+        help="Directory with basic data for a test case",
+    )
+    create_sp.add_argument(
+        "--stages", "-t", type=int, default=None, help="Number of stages"
+    )
+    create_sp.add_argument(
+        "--realizations",
+        "-n",
+        type=int,
+        default=None,
+        help="Number of realizations per stage",
+    )
+    create_sp.add_argument(
+        "--supplementary",
+        action="store_true",
+        required=False,
+        help="Create supplementary data only",
+    )
+
+    sweep_sp = subparsers.add_parser("sweep", help="Sweep results")
+    sweep_sp.add_argument(
+        "--gather", action="store_true", help="Gather results"
+    )
+    sweep_sp.add_argument(
+        "--clean", action="store_true", help="Clean result directories"
+    )
 
     return parser
 
 
-def _path(s: str) -> Path:
-    p = Path(s)
-    if not p.exists():
-        msg = f"Path '{p.resolve().absolute()}' does not exist."
-        raise ValueError(msg)
-    return Path(s)
-
-
-def _init_logging(verbose: bool = False) -> None:
+def _init_logging(verbose: bool = False, nofile: bool = False) -> None:
     """Initialize the logging."""
+    loggers = sddip.logging.config["loggers"]
     if verbose:
-        for l in sddip.logging.config["loggers"].values():
+        for l in loggers.values():
             l["level"] = "DEBUG"
+    if nofile:
+        sddip.logging.config["handlers"].pop("file")
+        for l in loggers.values():
+            handlers = l["handlers"]
+            with contextlib.suppress(ValueError):
+                handlers.remove("file")
+    else:
+        sddip.logging.create_logging_dir()
 
     logging.config.dictConfig(sddip.logging.config)
 
@@ -113,33 +148,32 @@ def _load_session(path: Path) -> session.Setup:
     return [session.TestSetup.from_dict(case) for case in tests["cases"]]
 
 
-def _try_execute_aux_func(args: argparse.Namespace) -> bool:
-    """Try to execute an auxiliary function.
+def _create(args: argparse.Namespace) -> None:
+    """Create data for a new test case."""
+    if args.supplementary:
+        create_supplementary.create_supplementary_data(
+            source_dir=args.test_base or args.test_case,
+            target_dir=args.test_case,
+        )
+    elif args.stages and args.realizations:
+        create_scenarios.create_scenario_data(
+            args.stages, args.realizations, args.test_case, args.test_base
+        )
+        create_supplementary.create_supplementary_data(
+            source_dir=args.test_base or args.test_case,
+            target_dir=args.test_case,
+        )
+    else:
+        msg = "Invalid arguments for number of stages and realizations."
+        raise ValueError(msg)
 
-    Return value indiactes whether an auxiliary function was executed or
-    not.
-    """
-    execution_successful = False
-    if (
-        args.t is not None
-        and args.n is not None
-        and args.test_case is not None
-    ):
-        if args.scenarios:
-            create_scenarios.create_scenario_data(
-                args.test_case, args.t, args.n
-            )
-            execution_successful = True
-        elif args.supplementary:
-            create_supplementary.create_supplementary_data(
-                args.test_case, args.t, args.n
-            )
-            execution_successful = True
-    elif args.gather:
+
+def _sweep(args: argparse.Namespace) -> None:
+    """Sweep results."""
+    if args.gather:
         gather_latest_results.main()
-        execution_successful = True
     elif args.clean:
         clear_result_directories.main()
-        execution_successful = True
-
-    return execution_successful
+    else:
+        msg = "Invalid arguments for sweep command."
+        raise ValueError(msg)

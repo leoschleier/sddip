@@ -3,7 +3,13 @@
 from pathlib import Path
 
 _file_path = Path() / "var" / "log"
-_file_path.mkdir(parents=True, exist_ok=True)
+
+
+def create_logging_dir() -> None:
+    """Create the logging directory."""
+    _file_path = Path() / "var" / "log"
+    _file_path.mkdir(parents=True, exist_ok=True)
+
 
 config = {
     "version": 1,

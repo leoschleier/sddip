@@ -1,12 +1,13 @@
-import os
+from pathlib import Path
 
 import pandas as pd
 
-from sddip import config
 
-
-def create_supplementary_data(test_case: str, t: int, n: int) -> None:
-    scenario_str = f"t{str(t).zfill(2)}_n{str(n).zfill(2)}"
+def create_supplementary_data(source_dir: Path, target_dir: Path) -> None:
+    """Create supplementary data for the given test case."""
+    if not target_dir.exists():
+        msg = f"Path '{target_dir.resolve().absolute()}' does not exist."
+        raise ValueError(msg)
 
     # Ramp rate
     # (%/100 of rated capacity per unit time)
@@ -14,15 +15,8 @@ def create_supplementary_data(test_case: str, t: int, n: int) -> None:
     # Min up/-down time
 
     # Parameter retrieval
-    test_case_raw_dir = os.path.join(config.TEST_CASES_DIR, test_case, "raw")
-    test_case_scenario_dir = os.path.join(
-        config.TEST_CASES_DIR, test_case, scenario_str
-    )
-
-    gen_file = os.path.join(test_case_raw_dir, "gen_data.txt")
-    supplementary_file_path = os.path.join(
-        test_case_scenario_dir, "gen_sup_data.txt"
-    )
+    gen_file = source_dir / "gen_data.txt"
+    supplementary_file_path = target_dir / "gen_sup_data.txt"
 
     gen_df = pd.read_csv(gen_file, delimiter=r"\s+")
 

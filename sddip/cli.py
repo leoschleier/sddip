@@ -11,6 +11,7 @@ from sddip import session
 from .operators import extensive_runner
 from .scripts import (
     clear_result_directories,
+    copy_raw,
     create_scenarios,
     create_supplementary,
     gather_latest_results,
@@ -166,6 +167,9 @@ def _create(args: argparse.Namespace) -> None:
     else:
         msg = "Invalid arguments for number of stages and realizations."
         raise ValueError(msg)
+
+    if args.test_base:
+        copy_raw.move_files(args.test_base, args.test_case)
 
 
 def _sweep(args: argparse.Namespace) -> None:

@@ -1,24 +1,35 @@
-import os
+from pathlib import Path
 
 import pandas as pd
 
-from sddip import config
 from sddip.sddip import scenarios
 
 
-def create_scenario_data(test_case: str, t: int, n: int) -> None:
-    scenario_str = f"t{str(t).zfill(2)}_n{str(n).zfill(2)}"
+def create_scenario_data(
+    t: int, n: int, test_case_dir: Path, base_case_dir: Path | None = None
+) -> None:
+    """Create scenario data for the given test case.
 
-    # Parameter retrieval
-    test_case_raw_dir = config.TEST_CASES_DIR / test_case / "raw"
-    test_case_scenario_dir = config.TEST_CASES_DIR / test_case / scenario_str
+    Args:
+        t: The number of stages.
+        n: The number of scenarios.
+        test_case_dir: The path to the test case directory.
+        base_case_dir: The path to the base case directory.
 
-    if not os.path.exists(test_case_scenario_dir):
-        os.makedirs(test_case_scenario_dir)
+    """
+    base_case_dir = base_case_dir or test_case_dir
 
-    bus_file_path = test_case_raw_dir / "bus_data.txt"
-    renewables_file_path = test_case_raw_dir / "ren_data.txt"
-    scenario_file_path = test_case_scenario_dir / "scenario_data.txt"
+    bus_file_path = base_case_dir / "bus_data.txt"
+    renewables_file_path = base_case_dir / "ren_data.txt"
+
+    for f in [bus_file_path, renewables_file_path]:
+        if not f.exists():
+            msg = f"Path '{f.resolve().absolute()}' does not exist."
+            raise ValueError(msg)
+
+    test_case_dir.mkdir(exist_ok=True, parents=True)
+
+    scenario_file_path = test_case_dir / "scenario_data.txt"
 
     bus_df = pd.read_csv(bus_file_path, delimiter=r"\s+")
     renewables_df = pd.read_csv(renewables_file_path, delimiter=r"\s+")

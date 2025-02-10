@@ -40,7 +40,7 @@ def main(argv: list[str]) -> None:
             else:
                 session_config = _load_session(args.session)
                 logger.info("Start test session")
-                session.start(session_config)
+                session.start(setup=session_config, seed=args.seed)
             logger.info("Execution completed")
 
 
@@ -59,6 +59,12 @@ def _create_argument_parser() -> argparse.ArgumentParser:
         type=Path,
         default="session.toml",
         help="Path to the TOML file containing the session config",
+    )
+    parser.add_argument(
+        "--seed",
+        type=str,
+        default=None,
+        help="Seed for the random number generator",
     )
     parser.add_argument(
         "--extensive",

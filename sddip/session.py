@@ -1,6 +1,7 @@
 """Execute a test session."""
 
 import logging
+import random as rdm
 import time
 import zoneinfo
 from dataclasses import dataclass, field
@@ -57,9 +58,17 @@ class TestSetup:
 
 Setup = list[TestSetup]
 
+type Seed = int | float | str | bytes | bytearray | None
 
-def start(setup: Setup) -> None:
+
+def start(setup: Setup, seed: Seed = None) -> None:
     """Start the test session."""
+    if seed is None:
+        seed = int(time.time())
+
+    logger.info("Seed: %s", seed)
+    rdm.seed(seed)
+
     log_manager = LogManager()
     for _test_setup in setup:
         start_time_str = dt.now(

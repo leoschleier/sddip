@@ -57,6 +57,13 @@ a `session.toml` file in the current working directory. The optional
 In the session config you can specify a sequence of test cases that will be
 executed within one session.
 
+A seed for the random number generator used in the scenario sampling can be set
+as follows:
+
+```bash
+python -m sddip --seed <my-seed>
+```
+
 ## Test Creation
 
 To create a new test case, use the following command:

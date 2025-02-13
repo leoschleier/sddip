@@ -1,0 +1,256 @@
+title = "Test Session"
+
+[tests]
+
+# Test cases to be executed sequentially.
+[[tests.cases]]
+
+name = "WB5_t02_n03_sddip"
+path = "data/01_test_cases/WB5/t02_n03"
+
+algorithm = "dsddip"  # Dynamic SDDiP
+
+sddip_n_binaries = 1
+
+sddip_max_iterations = 200
+sddip_time_limit = 3600
+
+sddip_no_improvement_tolerance = 0.001
+
+sddip_primary_cut_type = "sb"
+sddip_n_samples_primary = 1
+sddip_secondary_cut_type = "sb"
+sddip_n_samples_secondary = 1
+
+sddip_n_samples_final_ub = 1000
+
+[[tests.cases]]
+
+name = "WB5_t02_n10_sddip"
+path = "data/01_test_cases/WB5/t02_n10"
+
+algorithm = "dsddip"  # Dynamic SDDiP
+
+sddip_n_binaries = 1
+
+sddip_max_iterations = 200
+sddip_time_limit = 3600
+
+sddip_no_improvement_tolerance = 0.001
+
+sddip_primary_cut_type = "sb"
+sddip_n_samples_primary = 1
+sddip_secondary_cut_type = "sb"
+sddip_n_samples_secondary = 1
+
+sddip_n_samples_final_ub = 1000
+
+[[tests.cases]]
+
+name = "WB5_t02_n20_sddip"
+path = "data/01_test_cases/WB5/t02_n20"
+
+algorithm = "dsddip"  # Dynamic SDDiP
+
+sddip_n_binaries = 1
+
+sddip_max_iterations = 200
+sddip_time_limit = 3600
+
+sddip_no_improvement_tolerance = 0.001
+
+sddip_primary_cut_type = "sb"
+sddip_n_samples_primary = 1
+sddip_secondary_cut_type = "sb"
+sddip_n_samples_secondary = 1
+
+sddip_n_samples_final_ub = 1000
+
+[[tests.cases]]
+
+name = "WB5_t04_n03_sddip"
+path = "data/01_test_cases/WB5/t04_n03"
+
+algorithm = "dsddip"  # Dynamic SDDiP
+
+sddip_n_binaries = 1
+
+sddip_max_iterations = 200
+sddip_time_limit = 3600
+
+sddip_no_improvement_tolerance = 0.001
+
+sddip_primary_cut_type = "sb"
+sddip_n_samples_primary = 1
+sddip_secondary_cut_type = "sb"
+sddip_n_samples_secondary = 1
+
+sddip_n_samples_final_ub = 1000
+
+[[tests.cases]]
+
+name = "WB5_t04_n10_sddip"
+path = "data/01_test_cases/WB5/t04_n10"
+
+algorithm = "dsddip"  # Dynamic SDDiP
+
+sddip_n_binaries = 1
+
+sddip_max_iterations = 200
+sddip_time_limit = 3600
+
+sddip_no_improvement_tolerance = 0.001
+
+sddip_primary_cut_type = "sb"
+sddip_n_samples_primary = 1
+sddip_secondary_cut_type = "sb"
+sddip_n_samples_secondary = 1
+
+sddip_n_samples_final_ub = 1000
+
+[[tests.cases]]
+
+name = "WB5_t04_n20_sddip"
+path = "data/01_test_cases/WB5/t04_n20"
+
+algorithm = "dsddip"  # Dynamic SDDiP
+
+sddip_n_binaries = 1
+
+sddip_max_iterations = 200
+sddip_time_limit = 3600
+
+sddip_no_improvement_tolerance = 0.001
+
+sddip_primary_cut_type = "sb"
+sddip_n_samples_primary = 1
+sddip_secondary_cut_type = "sb"
+sddip_n_samples_secondary = 1
+
+sddip_n_samples_final_ub = 1000
+
+[[tests.cases]]
+
+name = "WB5_t08_n03_sddip"
+path = "data/01_test_cases/WB5/t08_n03"
+
+algorithm = "dsddip"  # Dynamic SDDiP
+
+sddip_n_binaries = 1
+
+sddip_max_iterations = 200
+sddip_time_limit = 3600
+
+sddip_no_improvement_tolerance = 0.001
+
+sddip_primary_cut_type = "sb"
+sddip_n_samples_primary = 1
+sddip_secondary_cut_type = "sb"
+sddip_n_samples_secondary = 1
+
+sddip_n_samples_final_ub = 1000
+
+[[tests.cases]]
+
+name = "WB5_t08_n10_sddip"
+path = "data/01_test_cases/WB5/t08_n10"
+
+algorithm = "dsddip"  # Dynamic SDDiP
+
+sddip_n_binaries = 1
+
+sddip_max_iterations = 200
+sddip_time_limit = 3600
+
+sddip_no_improvement_tolerance = 0.001
+
+sddip_primary_cut_type = "sb"
+sddip_n_samples_primary = 1
+sddip_secondary_cut_type = "sb"
+sddip_n_samples_secondary = 1
+
+sddip_n_samples_final_ub = 1000
+
+[[tests.cases]]
+
+name = "WB5_t08_n20_sddip"
+path = "data/01_test_cases/WB5/t08_n20"
+
+algorithm = "dsddip"  # Dynamic SDDiP
+
+sddip_n_binaries = 1
+
+sddip_max_iterations = 200
+sddip_time_limit = 3600
+
+sddip_no_improvement_tolerance = 0.001
+
+sddip_primary_cut_type = "sb"
+sddip_n_samples_primary = 1
+sddip_secondary_cut_type = "sb"
+sddip_n_samples_secondary = 1
+
+sddip_n_samples_final_ub = 1000
+
+[[tests.cases]]
+
+name = "WB5_t12_n03_sddip"
+path = "data/01_test_cases/WB5/t12_n03"
+
+algorithm = "dsddip"  # Dynamic SDDiP
+
+sddip_n_binaries = 1
+
+sddip_max_iterations = 200
+sddip_time_limit = 3600
+
+sddip_no_improvement_tolerance = 0.001
+
+sddip_primary_cut_type = "sb"
+sddip_n_samples_primary = 1
+sddip_secondary_cut_type = "sb"
+sddip_n_samples_secondary = 1
+
+sddip_n_samples_final_ub = 1000
+
+[[tests.cases]]
+
+name = "WB5_t12_n10_sddip"
+path = "data/01_test_cases/WB5/t12_n10"
+
+algorithm = "dsddip"  # Dynamic SDDiP
+
+sddip_n_binaries = 1
+
+sddip_max_iterations = 200
+sddip_time_limit = 3600
+
+sddip_no_improvement_tolerance = 0.001
+
+sddip_primary_cut_type = "sb"
+sddip_n_samples_primary = 1
+sddip_secondary_cut_type = "sb"
+sddip_n_samples_secondary = 1
+
+sddip_n_samples_final_ub = 1000
+
+[[tests.cases]]
+
+name = "WB5_t12_n20_sddip"
+path = "data/01_test_cases/WB5/t12_n20"
+
+algorithm = "dsddip"  # Dynamic SDDiP
+
+sddip_n_binaries = 1
+
+sddip_max_iterations = 200
+sddip_time_limit = 3600
+
+sddip_no_improvement_tolerance = 0.001
+
+sddip_primary_cut_type = "sb"
+sddip_n_samples_primary = 1
+sddip_secondary_cut_type = "sb"
+sddip_n_samples_secondary = 1
+
+sddip_n_samples_final_ub = 1000

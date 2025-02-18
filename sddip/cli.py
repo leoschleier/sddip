@@ -57,7 +57,7 @@ def _create_argument_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--session",
         type=Path,
-        default="session.toml",
+        default="sessions/demo.toml",
         help="Path to the TOML file containing the session config",
     )
     parser.add_argument(

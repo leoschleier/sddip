@@ -140,4 +140,10 @@ data/03_logs/*
 *.ilp
 
 # Temp directory
-/temp
+temp/
+
+# Session files
+sessions/*
+!sessions/demo.toml
+
+

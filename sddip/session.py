@@ -19,6 +19,7 @@ from sddip.sddip import (
 
 logger = logging.getLogger(__name__)
 
+type Seed = int | float | str | bytes | bytearray | None
 
 @dataclass
 class TestSetup:
@@ -49,6 +50,8 @@ class TestSetup:
     dual_solver_time_limit: int = field(default=5 * 60)
     dual_solver_max_iterations: int = field(default=5000)
 
+    seed: Seed = field(default_factory=lambda: int(time.time()))
+
     @classmethod
     def from_dict(cls, d: dict[str, Any], /) -> "TestSetup":
         """Create a `TestSetup` object from a dictionary."""
@@ -58,17 +61,10 @@ class TestSetup:
 
 Setup = list[TestSetup]
 
-type Seed = int | float | str | bytes | bytearray | None
 
 
-def start(setup: Setup, seed: Seed = None) -> None:
+def start(setup: Setup, seed: Seed=None) -> None:
     """Start the test session."""
-    if seed is None:
-        seed = int(time.time())
-
-    logger.info("Seed: %s", seed)
-    rdm.seed(seed)
-
     log_manager = LogManager()
     for _test_setup in setup:
         start_time_str = dt.now(
@@ -79,15 +75,19 @@ def start(setup: Setup, seed: Seed = None) -> None:
         )
         results_dir.mkdir(parents=True, exist_ok=True)
         log_manager.set_up_logger(results_dir / "sddip.log")
+
+        if seed is not None:
+            _test_setup.seed = seed
+
         run(_test_setup, str(results_dir))
 
 
 def run(setup: TestSetup, results_dir: str) -> None:
     """Execute a single test."""
-    # Parameters
     logger.info("Test case: %s", setup.name)
+    logger.info("Seed: %s", setup.seed)
+    rdm.seed(setup.seed)
 
-    # Dual solver
     dual_solver = dualsolver.BundleMethod(
         setup.dual_solver_max_iterations,
         setup.dual_solver_stop_tolerance,

@@ -96,7 +96,6 @@ class Algorithm:
         lagrangian_cut_iterations = []
         for i in range(n_iterations):
             logger.info("Iteration %s", i + 1)
-
             ########################################
             # Binary approximation refinement
             ########################################

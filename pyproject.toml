@@ -47,7 +47,6 @@ select = ["ALL"]
 ignore = [
     "ANN401", # Use of typing.Any  
     "COM812", # Missing trailing comma (formatter)
-    "ISC001", # Single line implicit string concatenation (formatter)
 ]
 fixable = ["ALL"]
 

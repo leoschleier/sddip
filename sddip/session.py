@@ -21,6 +21,7 @@ logger = logging.getLogger(__name__)
 
 type Seed = int | float | str | bytes | bytearray | None
 
+
 @dataclass
 class TestSetup:
     name: str
@@ -62,8 +63,7 @@ class TestSetup:
 Setup = list[TestSetup]
 
 
-
-def start(setup: Setup, seed: Seed=None) -> None:
+def start(setup: Setup, seed: Seed = None) -> None:
     """Start the test session."""
     log_manager = LogManager()
     for _test_setup in setup:

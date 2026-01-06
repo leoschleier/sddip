@@ -177,7 +177,7 @@ class ScenarioGenerator:
         inactive_bus_keys = []
 
         for b in range(n_buses):
-            bus_key = f"{label}{b+1}"
+            bus_key = f"{label}{b + 1}"
             if b in active_buses:
                 active_bus_keys.append(bus_key)
             else:

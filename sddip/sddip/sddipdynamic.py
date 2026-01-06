@@ -290,7 +290,7 @@ class Algorithm:
                 y_trial_point = y_kt
                 if any(x_bs_kt):
                     x_bs_trial_point = [
-                        [x_trial_point[g]] + x_bs_kt[g][:-1]
+                        [x_trial_point[g], *x_bs_kt[g][:-1]]
                         for g in range(self.problem_params.n_gens)
                     ]
                 soc_trial_point = soc_kt

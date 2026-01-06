@@ -38,10 +38,7 @@ class ResultStorage:
 
     def to_dataframe(self):
         """Create a pandas DataFrame from the results dictionary."""
-        if self.results:
-            results = self.results
-        else:
-            results = {("n/a", "n/a", "n/a"): {"n/a": "n/a"}}
+        results = self.results or {("n/a", "n/a", "n/a"): {"n/a": "n/a"}}
 
         df = pd.DataFrame.from_dict(results, orient="index")
         return df.rename_axis(self.index_names)

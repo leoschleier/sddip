@@ -138,22 +138,22 @@ class ModelBuilder(ABC):
         for s in range(self.n_storages):
             self.ys_c.append(
                 self.model.addVar(
-                    vtype=gp.GRB.CONTINUOUS, lb=0, name=f"y_c_{s+1}"
+                    vtype=gp.GRB.CONTINUOUS, lb=0, name=f"y_c_{s + 1}"
                 )
             )
             self.ys_dc.append(
                 self.model.addVar(
-                    vtype=gp.GRB.CONTINUOUS, lb=0, name=f"y_dc_{s+1}"
+                    vtype=gp.GRB.CONTINUOUS, lb=0, name=f"y_dc_{s + 1}"
                 )
             )
             self.u_c_dc.append(
                 self.model.addVar(
-                    vtype=self.bin_type, lb=0, ub=1, name=f"u_{s+1}"
+                    vtype=self.bin_type, lb=0, ub=1, name=f"u_{s + 1}"
                 )
             )
             self.soc.append(
                 self.model.addVar(
-                    vtype=gp.GRB.CONTINUOUS, lb=0, name=f"soc_{s+1}"
+                    vtype=gp.GRB.CONTINUOUS, lb=0, name=f"soc_{s + 1}"
                 )
             )
             self.socs_p.append(

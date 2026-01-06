@@ -177,7 +177,7 @@ class Algorithm:
             samples = self.sc_sampler.generate_samples(n_samples)
             logger.info("Samples: %s", samples)
             self.runtime_logger.log_task_end(
-                f"sampling_i{i+1}", sampling_start_time
+                f"sampling_i{i + 1}", sampling_start_time
             )
 
             ########################################
@@ -186,7 +186,7 @@ class Algorithm:
             forward_pass_start_time = time()
             v_opt_k = self.forward_pass(i, samples)
             self.runtime_logger.log_task_end(
-                f"forward_pass_i{i+1}", forward_pass_start_time
+                f"forward_pass_i{i + 1}", forward_pass_start_time
             )
 
             ########################################
@@ -198,7 +198,7 @@ class Algorithm:
             )
             logger.info("Statistical upper bound: %s", v_upper_l)
             self.runtime_logger.log_task_end(
-                f"upper_bound_i{i+1}", upper_bound_start_time
+                f"upper_bound_i{i + 1}", upper_bound_start_time
             )
 
             ########################################
@@ -221,7 +221,7 @@ class Algorithm:
                     ]
                 )
             self.runtime_logger.log_task_end(
-                f"backward_pass_i{i+1}", backward_pass_start_time
+                f"backward_pass_i{i + 1}", backward_pass_start_time
             )
 
             ########################################
@@ -232,7 +232,7 @@ class Algorithm:
             lower_bounds.append(v_lower)
             logger.info(f"Lower bound: {v_lower} ")
             self.runtime_logger.log_task_end(
-                f"lower_bound_i{i+1}", lower_bound_start_time
+                f"lower_bound_i{i + 1}", lower_bound_start_time
             )
 
             bound_dict = self.bound_storage.create_empty_result_dict()
@@ -371,7 +371,7 @@ class Algorithm:
                 y_trial_point = y_kt
                 if any(x_bs_kt):
                     x_bs_trial_point = [
-                        [x_trial_point[g]] + x_bs_kt[g][:-1]
+                        [x_trial_point[g], *x_bs_kt[g][:-1]]
                         for g in range(self.problem_params.n_gens)
                     ]
                 soc_trial_point = soc_kt

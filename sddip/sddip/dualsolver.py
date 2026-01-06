@@ -458,7 +458,7 @@ class BundleMethod(DualSolver):
                 (x[j] - x_best[j]) ** 2 for j in range(gradient_len)
             )
             subproblem.setObjective(obj, gp.GRB.MAXIMIZE)
-            subproblem.addConstr(v <= new_plane, name=f"{i+1}")
+            subproblem.addConstr(v <= new_plane, name=f"{i + 1}")
             subproblem.update()
 
             subproblem.setParam(

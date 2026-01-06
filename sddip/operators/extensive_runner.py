@@ -56,50 +56,56 @@ def main() -> None:
             n = node.index
             for g in range(params.n_gens):
                 x[t, n, g] = model.addVar(
-                    vtype=gp.GRB.BINARY, name=f"x_{t+1}_{n+1}_{g+1}"
+                    vtype=gp.GRB.BINARY, name=f"x_{t + 1}_{n + 1}_{g + 1}"
                 )
                 y[t, n, g] = model.addVar(
-                    vtype=gp.GRB.CONTINUOUS, lb=0, name=f"y_{t+1}_{n+1}_{g+1}"
+                    vtype=gp.GRB.CONTINUOUS,
+                    lb=0,
+                    name=f"y_{t + 1}_{n + 1}_{g + 1}",
                 )
                 s_up[t, n, g] = model.addVar(
-                    vtype=gp.GRB.BINARY, name=f"s_up_{t+1}_{n+1}_{g+1}"
+                    vtype=gp.GRB.BINARY, name=f"s_up_{t + 1}_{n + 1}_{g + 1}"
                 )
                 s_down[t, n, g] = model.addVar(
-                    vtype=gp.GRB.BINARY, name=f"s_down_{t+1}_{n+1}_{g+1}"
+                    vtype=gp.GRB.BINARY, name=f"s_down_{t + 1}_{n + 1}_{g + 1}"
                 )
             for s in range(params.n_storages):
                 ys_charge[t, n, s] = model.addVar(
                     vtype=gp.GRB.CONTINUOUS,
                     lb=0,
-                    name=f"ys_c_{t+1}_{n+1}_{s+1}",
+                    name=f"ys_c_{t + 1}_{n + 1}_{s + 1}",
                 )
                 ys_discharge[t, n, s] = model.addVar(
                     vtype=gp.GRB.CONTINUOUS,
                     lb=0,
-                    name=f"ys_dc_{t+1}_{n+1}_{s+1}",
+                    name=f"ys_dc_{t + 1}_{n + 1}_{s + 1}",
                 )
                 u[t, n, s] = model.addVar(
-                    vtype=gp.GRB.BINARY, name=f"u_{t+1}_{n+1}_{s+1}"
+                    vtype=gp.GRB.BINARY, name=f"u_{t + 1}_{n + 1}_{s + 1}"
                 )
                 soc[t, n, s] = model.addVar(
                     vtype=gp.GRB.CONTINUOUS,
                     lb=0,
-                    name=f"soc_{t+1}_{n+1}_{s+1}",
+                    name=f"soc_{t + 1}_{n + 1}_{s + 1}",
                 )
                 socs_p[t, n, s] = model.addVar(
-                    vtype=gp.GRB.CONTINUOUS, lb=0, name=f"socs_p_{n+1}_{s+1}"
+                    vtype=gp.GRB.CONTINUOUS,
+                    lb=0,
+                    name=f"socs_p_{n + 1}_{s + 1}",
                 )
                 socs_n[t, n, s] = model.addVar(
-                    vtype=gp.GRB.CONTINUOUS, lb=0, name=f"socs_n_{n+1}_{s+1}"
+                    vtype=gp.GRB.CONTINUOUS,
+                    lb=0,
+                    name=f"socs_n_{n + 1}_{s + 1}",
                 )
             ys_p[t, n] = model.addVar(
-                vtype=gp.GRB.CONTINUOUS, lb=0, name=f"ys_p_{t+1}_{n+1}"
+                vtype=gp.GRB.CONTINUOUS, lb=0, name=f"ys_p_{t + 1}_{n + 1}"
             )
             ys_n[t, n] = model.addVar(
-                vtype=gp.GRB.CONTINUOUS, lb=0, name=f"ys_n_{t+1}_{n+1}"
+                vtype=gp.GRB.CONTINUOUS, lb=0, name=f"ys_n_{t + 1}_{n + 1}"
             )
             delta[t, n] = model.addVar(
-                vtype=gp.GRB.CONTINUOUS, lb=0, name=f"delta_{t+1}_{n+1}"
+                vtype=gp.GRB.CONTINUOUS, lb=0, name=f"delta_{t + 1}_{n + 1}"
             )
             # model.addConstr(delta[t, n] == 0)
 

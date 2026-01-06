@@ -30,14 +30,14 @@ problem.
 
 ## Setup
 
-We use [Poetry](https://github.com/python-poetry/poetry) for packaging and
-dependency management. Please use `poetry install` to create a new virtual
-environment and to install the dependencies (including development
-requirements) specified in the `pyproject.toml` and the `poetry.lock` file.
+We use [uv](https://docs.astral.sh/uv/) for package and project management.
+Please use the `uv sync` command to install all depenencies (including the
+required Python version) in a virtual environment in the project's root
+directory.
 
 The above will also perform an editable install of the `sddip` package.
-Therefore, when activating the virtual environment with the `poetry shell`
-command, you will already be able to use the `sddip` command line interface.
+Therefore, when activating the virtual environment with, you will already be
+able to use the `sddip` command line interface.
 
 Run `python -m sddip -h` to get an overview of the options that the `sddip`
 command line interface provides.
@@ -51,7 +51,7 @@ python -m sddip --session <path-to-session.toml>
 ```
 
 By default, the `sddip` package will attempt to load the session config from
-a `session.toml` file in the current working directory. The optional
+a `sessions/demo.toml` file in the current working directory. The optional
 `--session` argument enables you to select an alternative session config.
 
 In the session config you can specify a sequence of test cases that will be

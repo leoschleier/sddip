@@ -1,6 +1,7 @@
 import logging
 from pathlib import Path
 
+import natsort
 import numpy as np
 import pandas as pd
 
@@ -239,23 +240,30 @@ class Parameters:
         p_d = []
         re = []
 
+        sorted_columns = scenario_df.columns.sort_values(
+            key=lambda v: pd.Index(natsort.natsort_key(v), tupleize_cols=False)
+        )
         for t in range(self.n_stages):
-            stage_df = scenario_df[scenario_df["t"] == t + 1]
+            stage_df = pd.DataFrame(scenario_df[scenario_df["t"] == t + 1])
             p_d.append(
                 stage_df[
-                    scenario_df.columns[
-                        scenario_df.columns.to_series().str.contains("Pd")
+                    sorted_columns[
+                        sorted_columns.to_series().str.contains("Pd")
                     ]
-                ].values.tolist()
+                ]
+                .to_numpy()
+                .tolist()
             )
             re.append(
                 stage_df[
-                    scenario_df.columns[
-                        scenario_df.columns.to_series().str.contains("Re")
+                    sorted_columns[
+                        sorted_columns.to_series().str.contains("Re")
                     ]
-                ].values.tolist()
+                ]
+                .to_numpy()
+                .tolist()
             )
-            prob.append(stage_df["p"].values.tolist())
+            prob.append(stage_df["p"].to_numpy().tolist())
 
         self.prob = prob
         self.p_d = p_d

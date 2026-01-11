@@ -45,12 +45,11 @@ class ScenarioGenerator:
             for max_value in max_value_targets
         ]
 
-        scenario_data = {"t": [1], "n": [1], "p": [1]}
-
         demand_bus_keys, no_demand_bus_keys = self.create_bus_keys(
             n_buses, demand_buses, "Pd"
         )
 
+        scenario_data: dict[str, list[float]] = {}
         # Set loads for buses without demand
         for b in no_demand_bus_keys:
             scenario_data[b] = [0] * self.n_total_realizations
@@ -63,18 +62,23 @@ class ScenarioGenerator:
                 )
             ]
 
+        probabilities: dict[str, list[float]] = {"t": [1], "n": [1], "p": [1]}
+
         # Set loads for stages >1
         for t in range(1, self.n_stages):
             for n in range(1, self.n_realizations_per_stage + 1):
-                scenario_data["t"].append(t + 1)
-                scenario_data["n"].append(n)
-                scenario_data["p"].append(1 / self.n_realizations_per_stage)
+                probabilities["t"].append(t + 1)
+                probabilities["n"].append(n)
+                probabilities["p"].append(1 / self.n_realizations_per_stage)
                 for b in range(len(demand_buses)):
                     scenario_data[demand_bus_keys[b]].append(
                         self.get_rdm_variation(
                             base_profiles[b][t], max_relative_variation
                         )
                     )
+
+        scenario_data = dict(sorted(scenario_data.items()))
+        scenario_data.update(probabilities)
 
         return pd.DataFrame(scenario_data)
 

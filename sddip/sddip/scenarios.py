@@ -1,5 +1,6 @@
 import random as rdm
 
+import natsort
 import numpy as np
 import pandas as pd
 
@@ -77,7 +78,7 @@ class ScenarioGenerator:
                         )
                     )
 
-        scenario_data = dict(sorted(scenario_data.items()))
+        scenario_data = dict(natsort.natsorted(scenario_data.items()))
         scenario_data.update(probabilities)
 
         return pd.DataFrame(scenario_data)

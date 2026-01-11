@@ -1,6 +1,7 @@
 import logging
 from pathlib import Path
 
+import natsort
 import numpy as np
 import pandas as pd
 
@@ -239,7 +240,9 @@ class Parameters:
         p_d = []
         re = []
 
-        sorted_columns = scenario_df.columns.sort_values()
+        sorted_columns = scenario_df.columns.sort_values(
+            key=lambda v: pd.Index(natsort.natsort_key(v), tupleize_cols=False)
+        )
         for t in range(self.n_stages):
             stage_df = pd.DataFrame(scenario_df[scenario_df["t"] == t + 1])
             p_d.append(

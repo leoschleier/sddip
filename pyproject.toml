@@ -12,9 +12,9 @@ classifiers = ["Programming Language :: Python :: 3.12"]
 requires-python = "==3.12.*"
 dependencies = [
     "gurobipy>=13.0.0",
-    "matplotlib>=3.10.8",
+    "matplotlib>=3.10.9",
     "natsort>=8.4.0",
-    "numpy>=2.4.0",
+    "numpy>=2.4.4",
     "pandas>=2.3.3",
     "scipy>=1.16.3",
 ]
@@ -23,7 +23,11 @@ dependencies = [
 HomePage = "https://github.com/leoschleier/sddip"
 
 [dependency-groups]
-dev = ["pyright>=1.1.407", "pytest>=9.0.2", "ruff>=0.14.10"]
+dev = [
+    "pyright>=1.1.407",
+    "pytest>=9.0.3",
+    "ruff>=0.14.10",
+]
 
 [build-system]
 requires = ["uv_build>=0.9.22,<0.10.0"]
